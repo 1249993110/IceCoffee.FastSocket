@@ -28,8 +28,4 @@
     <PackageReference Include="IceCoffee.Common" Version="1.0.0.30" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Pools\" />
-  </ItemGroup>
-
 </Project>

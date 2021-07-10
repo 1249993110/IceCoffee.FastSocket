@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 namespace IceCoffee.FastSocket.Tcp
 {
     /// <summary>
-    /// Tcp 服务端选项
+    /// Tcp 客户端选项
     /// </summary>
-    public class TcpServerOptions
+    public class TcpClientOptions
     {
         /// <summary>
         /// 选项：接收缓冲区大小
@@ -38,39 +38,6 @@ namespace IceCoffee.FastSocket.Tcp
         /// <remarks>
         /// 不延迟直接发送。Tcp为了合并小包而设计，客户端默认 false，服务端默认 true
         /// </remarks>
-        public bool NoDelay { get; set; } = true;
-
-        /// <summary>
-        /// 选项：重用地址
-        /// </summary>
-        /// <remarks>
-        /// 如果操作系统支持此功能，此选项将启用/禁用 SO_REUSEADDR
-        /// </remarks>
-        public bool ReuseAddress { get; set; }
-
-        /// <summary>
-        /// 选项：使套接字绑定为独占访问 
-        /// </summary>
-        /// <remarks>
-        /// 如果操作系统支持此功能，此选项将启用/禁用 SO_EXCLUSIVEADDRUSE
-        /// </remarks>
-        public bool ExclusiveAddressUse { get; set; }
-
-        /// <summary>
-        /// 选项：双模式
-        /// </summary>
-        /// <remarks>
-        /// 指定 Socket 是否是用于 IPv4 和 IPv6 的双模式套接字，仅当套接字绑定在 IPv6 地址上时才有效
-        /// </remarks>
-        public bool DualMode { get; set; }
-
-        /// <summary>
-        /// 选项：操作系统 TCP 缓存
-        /// </summary>
-        /// <remarks>
-        /// 此选项将设置侦听套接字的操作系统使用 TCP 缓存 SO_Backlog
-        /// <para>实际上是用于处理进站 (inbound)</para>
-        /// </remarks>
-        public int AcceptorBacklog { get; set; } = 1024;
+        public bool NoDelay { get; set; } = false;
     }
 }
