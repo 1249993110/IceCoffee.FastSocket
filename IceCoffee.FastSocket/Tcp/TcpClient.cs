@@ -1,9 +1,11 @@
-﻿using System;
+﻿using IceCoffee.FastSocket.Pools;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace IceCoffee.FastSocket.Tcp
@@ -12,15 +14,16 @@ namespace IceCoffee.FastSocket.Tcp
     {
         #region 字段
         private readonly Guid _id;
-        private bool _isConnecting;
-        private bool _isConnected;
-        private IPEndPoint _remoteEndpoint;
+        private ConnectionState _connectionState;
+        private EndPoint _remoteEndpoint;
         private readonly TcpClientOptions _options;
 
-        private Socket _socketConnecter;
+        protected readonly ReadBuffer ReadBuffer;
+
+        private ReceiveSaeaPool _recvSaeaPool;
+        private SendSaeaPool _sendSaeaPool;
         private SocketAsyncEventArgs _connectEventArg;
-        private SocketAsyncEventArgs _receiveEventArg;
-        private SocketAsyncEventArgs _sendEventArg;
+        private Socket _socketConnecter;
         #endregion
 
         #region 属性
@@ -30,19 +33,19 @@ namespace IceCoffee.FastSocket.Tcp
         public Guid Id => _id;
 
         /// <summary>
-        /// IP 终结点
+        /// 远程终结点
         /// </summary>
-        public IPEndPoint RemoteEndpoint => _remoteEndpoint;
+        public EndPoint RemoteEndpoint => _remoteEndpoint;
 
         /// <summary>
-        /// 客户端是否正在连接
+        /// 本地终结点
         /// </summary>
-        public bool IsConnecting => _isConnecting;
+        public EndPoint LocalEndPoint => _socketConnecter?.LocalEndPoint;
 
         /// <summary>
-        /// 客户端是否已经连接
+        /// 客户端连接状态
         /// </summary>
-        public bool IsConnected => _isConnected;
+        public ConnectionState ConnectionState => _connectionState;
 
         /// <summary>
         /// Tcp 客户端选项
@@ -52,162 +55,302 @@ namespace IceCoffee.FastSocket.Tcp
 
         #region 方法
         #region 构造方法
-        public TcpClient()
+        /// <summary>
+        /// 使用给定的服务器 IP 地址和端口号初始化 TCP 客户端
+        /// </summary>
+        /// <param name="address">IP address</param>
+        /// <param name="port">Port number</param>
+        /// <param name="options">Tcp client options</param>
+        public TcpClient(IPAddress address, int port, TcpClientOptions options = null) : this(new IPEndPoint(address, port), options) { }
+
+        /// <summary>
+        /// 使用给定的 host 和端口号初始化 TCP 客户端
+        /// </summary>
+        /// <param name="host">IP address</param>
+        /// <param name="port">Port number</param>
+        /// <param name="options">Tcp client options</param>
+        public TcpClient(string host, int port, TcpClientOptions options = null) : this(new DnsEndPoint(host, port), options) { }
+
+        /// <summary>
+        /// 使用给定的 IP 端点初始化 TCP 客户端
+        /// </summary>
+        /// <param name="endpoint">IP endpoint</param>
+        /// <param name="options">Tcp client options</param>
+        public TcpClient(EndPoint endpoint, TcpClientOptions options = null)
         {
             _id = Guid.NewGuid();
+            _remoteEndpoint = endpoint;
+            _options = options ?? new TcpClientOptions();
+            ReadBuffer = new ReadBuffer(CollectRecvSaea, _options.ReceiveBufferSize);
         }
-
         #endregion
 
         #region 私有方法
         private void OnAsyncCompleted(object sender, SocketAsyncEventArgs e)
         {
-            if (_isConnected == false && _isConnecting == false)
+            try
+            {
+                // 确定刚刚完成的操作类型并调用关联的处理程序
+                switch (e.LastOperation)
+                {
+                    case SocketAsyncOperation.Connect:
+                        ProcessConnect();
+                        break;
+                    case SocketAsyncOperation.Receive:
+                        ProcessReceive(e);
+                        break;
+                    case SocketAsyncOperation.Send:
+                        ProcessSend(e);
+                        break;
+                    default:
+                        throw new SocketException("套接字上完成的最后一个操作不是连接、接收或发送");
+                }
+            }
+            catch (SocketException ex)
+            {
+                RaiseException(ex);
+                ProcessClose(e);
+            }
+            catch (Exception ex)
+            {
+                RaiseException(new SocketException("Error in OnAsyncCompleted", ex));
+                ProcessClose(e);
+            }
+        }
+
+        private void ProcessConnect()
+        {
+            SocketAsyncEventArgs receiveSaea = null;
+            try
+            {
+                if (_connectEventArg.SocketError != SocketError.Success)
+                {
+                    throw new SocketException("异常 socket 连接", _connectEventArg.SocketError);
+                }
+                else
+                {
+                    ChangeConnectionState(ConnectionState.Connected);
+                    OnConnected();
+
+                    receiveSaea = _recvSaeaPool.Take();
+                    if (_socketConnecter.ReceiveAsync(receiveSaea) == false)
+                    {
+                        ProcessReceive(receiveSaea);
+                    }
+                }
+            }
+            catch (SocketException ex)
+            {
+                RaiseException(ex);
+                ProcessClose(receiveSaea);
+            }
+            catch (Exception ex)
+            {
+                RaiseException(new SocketException("Error in ProcessConnect", ex));
+                ProcessClose(receiveSaea);
+            }
+        }
+
+        private void ProcessReceive(SocketAsyncEventArgs e)
+        {
+            try
+            {
+                SocketError socketError = e.SocketError;
+
+                if (socketError != SocketError.Success)
+                {
+                    throw new SocketException("异常 socket 连接", socketError);
+                }
+                else
+                {
+                    // If zero is returned from a read operation, the remote end has closed the connection
+                    if (e.BytesTransferred == 0)
+                    {
+                        ProcessClose(e);
+                    }
+                    else
+                    {
+                        ReadBuffer.CacheSaea(e);
+                        OnReceived();
+
+                        SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
+                        if (_socketConnecter.ReceiveAsync(receiveSaea) == false)
+                        {
+                            ProcessReceive(receiveSaea);
+                        }
+                    }
+                }
+            }
+            catch (SocketException ex)
+            {
+                RaiseException(ex);
+                ProcessClose(e);
+            }
+            catch (Exception ex)
+            {
+                RaiseException(new SocketException("Error in ProcessReceive", ex));
+                ProcessClose(e);
+            }
+        }
+
+        private void ProcessSend(SocketAsyncEventArgs e)
+        {
+            try
+            {
+                if (e.SocketError != SocketError.Success)
+                {
+                    throw new SocketException("异常 socket 连接", e.SocketError);
+                }
+                else
+                {
+                    CollectSendSaea(e);
+                }
+            }
+            catch (SocketException ex)
+            {
+                RaiseException(ex);
+                ProcessClose(e);
+            }
+            catch (Exception ex)
+            {
+                RaiseException(new SocketException("Error in ProcessSend", ex));
+                ProcessClose(e);
+            }
+        }
+
+        /// <summary>
+        /// 处理关闭
+        /// </summary>
+        /// <param name="e"></param>
+        private void ProcessClose(SocketAsyncEventArgs e)
+        {
+            try
+            {
+                if (e == null)
+                {
+                    return;
+                }
+
+                e.Dispose();
+                
+                if(_connectionState == ConnectionState.Connected || _connectionState == ConnectionState.Connecting)
+                {
+                    DisconnectAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                RaiseException(new SocketException("Error in ProcessClose", ex));
+            }
+        }
+
+        /// <summary>
+        /// 引发异常
+        /// </summary>
+        private void RaiseException(SocketException socketException)
+        {
+            SocketError error = socketException.SocketError;
+            //跳过断开连接错误 
+            if (error == SocketError.ConnectionAborted
+                || error == SocketError.ConnectionRefused
+                || error == SocketError.ConnectionReset
+                || error == SocketError.OperationAborted
+                || error == SocketError.Shutdown)
             {
                 return;
             }
 
-            // 确定刚刚完成的操作类型并调用关联的处理程序
-            switch (e.LastOperation)
-            {
-                case SocketAsyncOperation.Connect:
-                    ProcessConnect(e);
-                    break;
-                case SocketAsyncOperation.Receive:
-                    if (ProcessReceive(e))
-                        TryReceive();
-                    break;
-                case SocketAsyncOperation.Send:
-                    if (ProcessSend(e))
-                        TrySend();
-                    break;
-                default:
-                    throw new ArgumentException("套接字上完成的最后一个操作不是接收或发送");
-            }
-
+            OnException(socketException);
+        }
+        
+        /// <summary>
+        /// 改变连接状态
+        /// </summary>
+        /// <param name="connectionState"></param>
+        private void ChangeConnectionState(ConnectionState connectionState)
+        {
+            _connectionState = connectionState;
+            OnConnectionStateChanged(connectionState);
         }
 
-
-        private void OnConnectAsyncCompleted(object sender, SocketAsyncEventArgs e)
+        #region Send data to server
+        /// <summary>
+        /// 向客户端发送数据（异步）
+        /// </summary>
+        /// <param name="buffer"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        public virtual void SendAsync(byte[] buffer, int offset, int count)
         {
-            SocketError socketError = e.SocketError;
-            if (socketError != SocketError.Success)
+            if (_connectionState != ConnectionState.Connected || count <= 0)
             {
-                throw new NetworkException("Socket已关闭，重叠的操作被中止，SocketError：" + socketError.ToString());
+                return;
             }
 
-            int sessionID = _socketConnecter.Handle.ToInt32();
-            SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
-
-            _session.Attach(_socketConnecter, sessionID);
-
-            try
+            var e = _sendSaeaPool.Take();
+            e.SetBuffer(buffer, offset, count);
+            if (_socketConnecter.SendAsync(e) == false)
             {
-                OnInternalConnectionStateChanged(ConnectionState.Connected);
-                OnConnected();
-                if (_socketConnecter.ReceiveAsync(receiveSaea) == false)
-                {
-                    Task.Run(() =>
-                    {
-                        OnRecvAsyncRequestCompleted(_socketConnecter, receiveSaea);
-                    });
-                }
-            }
-            catch
-            {
-                ProcessClose(CloseReason.ApplicationError);
-                throw;
+                ProcessSend(e);
             }
         }
-
-        private void OnRecvAsyncRequestCompleted(object sender, SocketAsyncEventArgs e)
+        /// <summary>
+        /// 向客户端发送数据（异步）
+        /// </summary>
+        /// <param name="buffer"></param>
+        public virtual void SendAsync(byte[] buffer)
         {
-            SocketError socketError = e.SocketError;
-            if (e.BytesTransferred > 0 && socketError == SocketError.Success)
-            {
-                try
-                {
-                    _session.ReadBuffer.CacheSaea(e);
-
-                    // 主动关闭会话
-                    if (_session.socket == null)
-                    {
-                        ProcessClose(CloseReason.ClientClosing);
-                    }
-                    else
-                    {
-                        SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
-
-                        if (_socketConnecter.ReceiveAsync(receiveSaea) == false)
-                        {
-                            OnRecvAsyncRequestCompleted(sender, receiveSaea);
-                        }
-                    }
-                }
-                catch
-                {
-                    ProcessClose(CloseReason.InternalError);
-                    throw;
-                }
-            }
-            else
-            {
-                ProcessClose(CloseReason.SocketError);
-                throw new NetworkException("异常socket连接，SocketError：" + socketError);
-            }
+            SendAsync(buffer, 0, buffer.Length);
         }
 
-
-        private void ProcessClose(CloseReason closeReason)
+        /// <summary>
+        /// 向客户端发送数据（异步）
+        /// </summary>
+        /// <param name="bufferList"></param>
+        public virtual void SendAsync(IList<ArraySegment<byte>> bufferList)
         {
-            if (_connectionState == ConnectionState.Connected) //已连接
+            if (_connectionState != ConnectionState.Connected || bufferList.Count <= 0)
             {
-                _session.Close();
-
-                OnInternalConnectionStateChanged(ConnectionState.Disconnected);
-                _session.OnClosed(closeReason);
-                OnDisconnected(closeReason);
-                _session.Detach();
-
-                _session.ReadBuffer.CollectAllRecvSaeaAndReset();
-
-                _session = null;
-
-                if (_autoReconnectMaxCount > 0 && _autoReconnectCount == 0)
-                {
-                    AutoReconnect();
-                }
-            }
-        }
-
-        private void OnInternalSend(ITcpSessionBase session, byte[] data, int offset, int count)
-        {
-            if (count <= _sendBufferSize)// 如果count小于发送缓冲区大小，此时count应不大于data.Length
-            {
-                SocketAsyncEventArgs sendSaea = _sendSaeaPool.Take();
-                Array.Copy(data, offset, sendSaea.Buffer, 0, count);
-                sendSaea.SetBuffer(0, count);
-                if (_socketConnecter.SendAsync(sendSaea) == false)
-                {
-                    OnSendAsyncRequestCompleted(_socketConnecter, sendSaea);
-                }
-            }
-        }
-
-        private void OnSendAsyncRequestCompleted(object sender, SocketAsyncEventArgs e)
-        {
-            if (e.SocketError != SocketError.Success)
-            {
-                ProcessClose(CloseReason.SocketError);
-                throw new NetworkException("异常socket连接，SocketError：" + e.SocketError);
+                return;
             }
 
-            _sendSaeaPool.Put(e);
+            var e = _sendSaeaPool.Take();
+            e.BufferList = bufferList;
+            if (_socketConnecter.SendAsync(e) == false)
+            {
+                ProcessSend(e);
+            }
         }
         #endregion
 
+        #region Check connection timeout
+        private CancellationTokenSource _checkConnectionTimeoutCTS;
+        private void CheckConnectionTimeout(Task task)
+        {
+            try
+            {
+                if (_connectionState == ConnectionState.Connecting)
+                {
+                    throw new SocketException("连接尝试超时，或者连接的主机没有响应", new TimeoutException("Connect timeout"));
+                }
+            }
+            catch (SocketException ex)
+            {
+                RaiseException(ex);
+                DisconnectAsync();
+            }
+        }
+        #endregion
+        #endregion
+
         #region 保护方法
-        // <summary>
+        /// <summary>
+        /// 当发生非检查异常时调用
+        /// </summary>
+        /// <param name="socketException"></param>
+        protected virtual void OnException(SocketException socketException) { }
+
+        /// <summary>
         /// 创建一个新的套接字接受器对象
         /// </summary>
         /// <remarks>
@@ -216,7 +359,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// <returns>Socket object</returns>
         protected virtual Socket CreateSocketConnecter()
         {
-            var socket = new Socket(_remoteEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
 
             // 应用选项：使用 keep-alive
             socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, _options.KeepAlive);
@@ -229,94 +372,126 @@ namespace IceCoffee.FastSocket.Tcp
         /// <summary>
         /// 连接成功时调用
         /// </summary>
-        protected virtual void OnConnected()
-        {
-            
-        }
+        protected virtual void OnConnected() {  }
 
         /// <summary>
         /// 断开连接时调用
         /// </summary>
-        protected virtual void OnDisconnected()
+        protected virtual void OnDisconnected() { }
+
+        /// <summary>
+        /// 收到数据后调用
+        /// </summary>
+        protected virtual void OnReceived() { }
+
+        /// <summary>
+        /// 连接状态改变时调用
+        /// </summary>
+        /// <param name="connectionState"></param>
+        protected virtual void OnConnectionStateChanged(ConnectionState connectionState) { }
+        #endregion
+
+        #region 公开方法
+        /// <summary>
+        /// 连接服务端（异步）
+        /// </summary>
+        public void ConnectAsync()
         {
+            if (_connectionState != ConnectionState.Disconnected)
+            {
+                throw new SocketException("尝试连接失败，已经连接成功或正在连接或正在断开");
+            }
+
+            ChangeConnectionState(ConnectionState.Connecting);
+
+            _recvSaeaPool = new ReceiveSaeaPool(OnAsyncCompleted, _options.ReceiveBufferSize);
+            _sendSaeaPool = new SendSaeaPool(OnAsyncCompleted);
+
+            _connectEventArg = new SocketAsyncEventArgs();
+            _connectEventArg.Completed += OnAsyncCompleted;
+            _connectEventArg.RemoteEndPoint = _remoteEndpoint;
+
+            _socketConnecter = CreateSocketConnecter();
+
+            _checkConnectionTimeoutCTS = new CancellationTokenSource();
+            Task.Delay(_options.ConnectionTimeout, _checkConnectionTimeoutCTS.Token).ContinueWith(CheckConnectionTimeout, _checkConnectionTimeoutCTS.Token);
+
+            if (_socketConnecter.ConnectAsync(_connectEventArg) == false)
+            {
+                ProcessConnect();
+            }
+        }
+
+        /// <summary>
+        /// 重新连接（异步）
+        /// </summary>
+        public void ReconnectAsync()
+        {
+            DisconnectAsync();
+            ConnectAsync();
+        }
+
+        /// <summary>
+        /// 断开连接（异步）
+        /// </summary>
+        public void DisconnectAsync()
+        {
+            if ((_connectionState != ConnectionState.Connected && _connectionState != ConnectionState.Connecting) 
+                || _connectionState == ConnectionState.Disconnecting)
+            {
+                throw new SocketException("尝试断开失败，未连接成功或未正在连接或正在断开");
+            }
+
+            // Cancel connecting operation
+            if (_connectionState == ConnectionState.Connecting)
+            {
+                Socket.CancelConnectAsync(_connectEventArg);
+                _checkConnectionTimeoutCTS.Cancel(false);
+            }
+
+            ChangeConnectionState(ConnectionState.Disconnecting);
+
+            ReadBuffer.Clear();
+            _recvSaeaPool.Dispose();
+            _recvSaeaPool = null;
+            _sendSaeaPool.Dispose();
+            _sendSaeaPool = null;
+            _connectEventArg.Dispose();
+            _connectEventArg = null;
+            _socketConnecter.Dispose();
+            _socketConnecter = null;
+
+            ChangeConnectionState(ConnectionState.Disconnected);
+            OnDisconnected();
         }
 
         #endregion
 
-        #region 公开方法
-        public void Connect(string ipStr, ushort port)
+        #region 回收资源
+        internal void CollectRecvSaea(SocketAsyncEventArgs e)
         {
-            if (_socketConnecter != null && _socketConnecter.Connected)
+            if (_connectionState == ConnectionState.Connected)
             {
-                DisconnectAsync();
+                _recvSaeaPool.Put(e);
             }
-
-            _isConnecting = true;
-
-            _connectEventArg = new SocketAsyncEventArgs();
-            _connectEventArg.Completed += OnConnectAsyncCompleted;
-
-            _socketConnecter = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-            _session = new TSession();
-            _session.Initialize(this, OnInternalSend, _recvSaeaPool.Put);
-
-            bool isNumberIP = IPAddress.TryParse(ipStr, out _ipAddress);// 数字IP
-            if (isNumberIP == false)// 域名
+            else
             {
-                _ipAddress = Dns.GetHostEntry(ipStr).AddressList.Where(p => p.AddressFamily == AddressFamily.InterNetwork).First();
-            }
-
-            _connectEventArg.RemoteEndPoint = new IPEndPoint(_ipAddress, _port);
-
-            if (_socketConnecter.ConnectAsync(_connectEventArg) == false)
-            {
-                OnConnectAsyncCompleted(_socketConnecter, _connectEventArg);
+                e.Dispose();
             }
         }
-
-
-        public void Reconnect()
+        private void CollectSendSaea(SocketAsyncEventArgs e)
         {
-            Connect(_ipAddress.ToString(), _port);
-        }
-
-        public bool DisconnectAsync()
-        {
-            if (_isConnected == false && _isConnecting == false)
+            if (_connectionState == ConnectionState.Connected)
             {
-                return false;
-            }    
-
-            // Cancel connecting operation
-            if (_isConnecting)
-            {
-                Socket.CancelConnectAsync(_connectEventArg);
+                e.SetBuffer(null, 0, 0);
+                e.BufferList = null;
+                _sendSaeaPool.Put(e);
             }
-
-            // Reset event args
-            _connectEventArg.Completed -= OnAsyncCompleted;
-            _receiveEventArg.Completed -= OnAsyncCompleted;
-            _sendEventArg.Completed -= OnAsyncCompleted;
-
-
-            if (_session != null && _connectionState != ConnectionState.Disconnected)
+            else
             {
-                OnInternalConnectionStateChanged(ConnectionState.Disconnecting);
-
-                _session.Close();
-                _recvSaeaPool.Dispose();
-                _sendSaeaPool.Dispose();
-
-                OnInternalConnectionStateChanged(ConnectionState.Disconnected);
-                _session.OnClosed(CloseReason.ClientClosing);
-                OnDisconnected(CloseReason.ClientClosing);
-                _session.Detach();
-
-                _session = null;
+                e.Dispose();
             }
         }
-
         #endregion
 
         #region IDisposable implementation

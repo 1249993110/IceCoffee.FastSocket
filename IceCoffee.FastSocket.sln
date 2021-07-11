@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31402.337
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IceCoffee.FastSocket", "IceCoffee.FastSocket\IceCoffee.FastSocket.csproj", "{CCB271AF-4AB8-4B4E-BB0C-E07FB49F579E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IceCoffee.FastSocket", "IceCoffee.FastSocket\IceCoffee.FastSocket.csproj", "{CCB271AF-4AB8-4B4E-BB0C-E07FB49F579E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTest", "UnitTest\UnitTest.csproj", "{0A740023-73AC-493A-800D-EEE90404BC55}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTest", "UnitTest\UnitTest.csproj", "{D9AEC1DF-1643-4557-9911-A55F91C6576C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,10 +17,10 @@ Global
 		{CCB271AF-4AB8-4B4E-BB0C-E07FB49F579E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CCB271AF-4AB8-4B4E-BB0C-E07FB49F579E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CCB271AF-4AB8-4B4E-BB0C-E07FB49F579E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0A740023-73AC-493A-800D-EEE90404BC55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0A740023-73AC-493A-800D-EEE90404BC55}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0A740023-73AC-493A-800D-EEE90404BC55}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0A740023-73AC-493A-800D-EEE90404BC55}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9AEC1DF-1643-4557-9911-A55F91C6576C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9AEC1DF-1643-4557-9911-A55F91C6576C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9AEC1DF-1643-4557-9911-A55F91C6576C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9AEC1DF-1643-4557-9911-A55F91C6576C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

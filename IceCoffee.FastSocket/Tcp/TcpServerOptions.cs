@@ -18,12 +18,6 @@ namespace IceCoffee.FastSocket.Tcp
         public int ReceiveBufferSize { get; set; } = 8192;
 
         /// <summary>
-        /// 选项：发送缓冲区大小
-        /// </summary>
-        /// <remarks>默认值是 8192</remarks>
-        public int SendBufferSize { get; set; } = 8192;
-
-        /// <summary>
         /// 使用 keep-alive
         /// </summary>
         /// <remarks>

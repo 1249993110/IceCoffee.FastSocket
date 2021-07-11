@@ -24,11 +24,12 @@ namespace IceCoffee.FastSocket.Tcp
         private readonly TcpServerOptions _options;
 
         private readonly ConcurrentDictionary<int, TcpSession> _sessions;
+
+        private TcpSessionPool _sessionPool;
+        private ReceiveSaeaPool _recvSaeaPool;
+        private SendSaeaPool _sendSaeaPool;
         private SocketAsyncEventArgs _acceptEventArg;
         private Socket _socketAcceptor;
-        private TcpSessionPool _sessionPool;
-        private SaeaPool _recvSaeaPool;
-        private SaeaPool _sendSaeaPool;
         #endregion
 
         #region 属性
@@ -64,7 +65,6 @@ namespace IceCoffee.FastSocket.Tcp
         #endregion
 
         #region 方法
-
         #region 构造方法
         /// <summary>
         /// 使用给定的 IP 地址和端口号初始化 TCP 服务器
@@ -86,7 +86,7 @@ namespace IceCoffee.FastSocket.Tcp
             : this(new IPEndPoint(IPAddress.Parse(address), port), options)
         {
         }
-
+        
         /// <summary>
         /// 使用给定的 IP 端点初始化 TCP 服务器
         /// </summary>
@@ -123,23 +123,13 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         private void ProcessAccept()
         {
-            Socket socket = _acceptEventArg.AcceptSocket;
-            SocketError socketError = _acceptEventArg.SocketError;
-
-            // 会话未开始，只需 ShutdownAndClose
             if (_isListening == false)
             {
-                try
-                {
-                    socket.Shutdown(SocketShutdown.Both);
-                }
-                finally
-                {
-                    socket.Close();
-                }
-
                 return;
             }
+
+            Socket socket = _acceptEventArg.AcceptSocket;
+            SocketError socketError = _acceptEventArg.SocketError;
 
             // 接受下一个客户端连接
             Task.Run(StartAccept);
@@ -156,7 +146,7 @@ namespace IceCoffee.FastSocket.Tcp
                 {
                     int sessionId = socket.Handle.ToInt32();
                     session = _sessionPool.Take();
-                    session.Initialize(socket, this, sessionId);
+                    session.Initialize(socket, sessionId);
 
                     if(_sessions.TryAdd(sessionId, session) == false)
                     {
@@ -175,13 +165,13 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (SocketException ex)
             {
-                ProcessClose(receiveSaea);
                 RaiseException(ex);
+                ProcessClose(receiveSaea);
             }
             catch (Exception ex)
             {
-                ProcessClose(receiveSaea);
                 RaiseException(new SocketException("Error in ProcessAccept", ex));
+                ProcessClose(receiveSaea);
             }
         }
 
@@ -199,39 +189,46 @@ namespace IceCoffee.FastSocket.Tcp
         #region Recv data from clients
         private void ProcessReceive(SocketAsyncEventArgs e)
         {
-            TcpSession session = e.UserToken as TcpSession;
-            SocketError socketError = e.SocketError;
-
             try
             {
-                if (e.BytesTransferred > 0 && socketError == SocketError.Success)
+                TcpSession session = e.UserToken as TcpSession;
+                SocketError socketError = e.SocketError;
+
+                if (socketError != SocketError.Success)
                 {
-                    session.ReadBuffer.CacheSaea(e);
-                    session.OnReceived();
-
-                    SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
-                    receiveSaea.UserToken = session;
-
-                    if (session._socket.ReceiveAsync(receiveSaea) == false)
-                    {
-                        ProcessReceive(receiveSaea);
-                    }
+                    throw new SocketException("异常 socket 连接", socketError);
                 }
                 else
                 {
-                    throw new SocketException("异常 socket 连接", socketError);
+                    // If zero is returned from a read operation, the remote end has closed the connection
+                    if (e.BytesTransferred == 0)
+                    {
+                        ProcessClose(e);
+                    }
+                    else
+                    {
+                        session.ReadBuffer.CacheSaea(e);
+                        session.OnReceived();
+
+                        SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
+                        receiveSaea.UserToken = session;
+
+                        if (session._socket.ReceiveAsync(receiveSaea) == false)
+                        {
+                            ProcessReceive(receiveSaea);
+                        }
+                    }
                 }
             }
             catch(SocketException ex)
             {
-                ProcessClose(e);
                 RaiseException(ex);
+                ProcessClose(e);
             }
             catch (Exception ex)
             {
+                RaiseException(new SocketException("Error in ProcessReceive", ex));
                 ProcessClose(e);
-                string errorMsg = $"Error in ProcessReceive，会话Id: {session.SessionId}, IPEndPoint: {session.RemoteIPEndPoint} 即将关闭";
-                RaiseException(new SocketException(errorMsg, ex));
             }
         }
         private void OnRecvAsyncCompleted(object sender, SocketAsyncEventArgs e)
@@ -241,45 +238,27 @@ namespace IceCoffee.FastSocket.Tcp
         #endregion
 
         #region Send data to clients
-        public void SendAsync(TcpSession session, byte[] data, int offset, int count)
-        {
-            if(count <= 0)
-            {
-                return;
-            }
-
-            Socket socket = session._socket;
-            SocketAsyncEventArgs sendSaea = _sendSaeaPool.Take();
-            sendSaea.UserToken = session;
-
-            int sendCount = count;
-            int sendBufferSize = _options.SendBufferSize;
-            if (count > sendBufferSize)// 如果 count 大于发送缓冲区大小
-            {
-                sendCount = sendBufferSize;
-                Array.Copy(data, offset, sendSaea.Buffer, 0, sendCount);
-                sendSaea.SetBuffer(0, sendCount);
-                if (socket.SendAsync(sendSaea) == false)
-                {
-                    ProcessSend(sendSaea);
-                }
-
-                SendAsync(session, data, offset + sendCount, count - sendCount);
-            }
-            else
-            {
-                Array.Copy(data, offset, sendSaea.Buffer, 0, sendCount);
-                sendSaea.SetBuffer(0, sendCount);
-                if (socket.SendAsync(sendSaea) == false)
-                {
-                    ProcessSend(sendSaea);
-                }
-            }
-        }
         private void ProcessSend(SocketAsyncEventArgs e)
         {
-            if (e.SocketError != SocketError.Success)
+            try
             {
+                if (e.SocketError != SocketError.Success)
+                {
+                    throw new SocketException("异常 socket 连接", e.SocketError);
+                }
+                else
+                {
+                    CollectSendSaea(e);
+                }
+            }
+            catch (SocketException ex)
+            {
+                RaiseException(ex);
+                ProcessClose(e);
+            }
+            catch (Exception ex)
+            {
+                RaiseException(new SocketException("Error in ProcessSend", ex));
                 ProcessClose(e);
             }
         }
@@ -287,47 +266,103 @@ namespace IceCoffee.FastSocket.Tcp
         {
             ProcessSend(e);
         }
+        /// <summary>
+        /// 向客户端发送数据（异步）
+        /// </summary>
+        /// <param name="session"></param>
+        /// <param name="buffer"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        public virtual void SendAsync(TcpSession session, byte[] buffer, int offset, int count)
+        {
+            if (_isListening == false || count <= 0)
+            {
+                return;
+            }
+
+            Socket socket = session._socket;
+            var e = _sendSaeaPool.Take();
+            e.UserToken = session;
+            e.SetBuffer(buffer, offset, count);
+
+            if (socket.SendAsync(e) == false)
+            {
+                ProcessSend(e);
+            }
+        }
+        /// <summary>
+        /// 向客户端发送数据（异步）
+        /// </summary>
+        /// <param name="session"></param>
+        /// <param name="buffer"></param>
+        public virtual void SendAsync(TcpSession session, byte[] buffer)
+        {
+            SendAsync(session, buffer, 0, buffer.Length);
+        }
+
+        /// <summary>
+        /// 向客户端发送数据（异步）
+        /// </summary>
+        /// <param name="session"></param>
+        /// <param name="bufferList"></param>
+        public virtual void SendAsync(TcpSession session, IList<ArraySegment<byte>> bufferList)
+        {
+            if (_isListening == false || bufferList.Count <= 0)
+            {
+                return;
+            }
+
+            Socket socket = session._socket;
+            var e = _sendSaeaPool.Take();
+            e.UserToken = session;
+            e.BufferList = bufferList;
+
+            if (socket.SendAsync(e) == false)
+            {
+                ProcessSend(e);
+            }
+        }
         #endregion
-        
+
         /// <summary>
         /// 处理关闭
         /// </summary>
         /// <param name="e"></param>
         private void ProcessClose(SocketAsyncEventArgs e)
         {
-            TcpSession session = e.UserToken as TcpSession;
-            
-            if (_isListening)
+            try
             {
+                if (e == null)
+                {
+                    return;
+                }
+
+                TcpSession session = e.UserToken as TcpSession;
                 if (session != null)
                 {
-                    _sessions.TryRemove(session.SessionId, out _);
-
-                    session.Close();
-                    OnSessionClosed(session);
-                    _sessionPool.Put(session);
+                    CollectSession(session);
                 }
 
-                if(e != null)
+                switch (e.LastOperation)
                 {
-                    switch (e.LastOperation)
-                    {
-                        case SocketAsyncOperation.Receive:
-                            _recvSaeaPool.Put(e);
-                            break;
-                        case SocketAsyncOperation.Send:
-                            _sendSaeaPool.Put(e);
-                            break;
-                        default:
-                            e.Dispose();
-                            throw new SocketException("套接字上完成的最后一个操作不是接收或发送");
-                    }
+                    case SocketAsyncOperation.Receive:
+                        CollectRecvSaea(e);
+                        break;
+                    case SocketAsyncOperation.Send:
+                        CollectSendSaea(e);
+                        break;
+                    default:
+                        e.Dispose();
+                        throw new SocketException("套接字上完成的最后一个操作不是接收或发送");
                 }
             }
-            else
+            catch (SocketException ex)
             {
-                session?.Close();
-                e?.Dispose();
+                RaiseException(ex);
+            }
+            catch (Exception ex)
+            {
+                RaiseException(new SocketException("Error in ProcessClose", ex));
             }
         }
 
@@ -352,6 +387,10 @@ namespace IceCoffee.FastSocket.Tcp
         #endregion
 
         #region 保护方法
+        /// <summary>
+        /// 当发生非检查异常时调用
+        /// </summary>
+        /// <param name="socketException"></param>
         protected virtual void OnException(SocketException socketException) {  }
         
         /// <summary>
@@ -387,9 +426,9 @@ namespace IceCoffee.FastSocket.Tcp
         /// 创建会话
         /// </summary>
         /// <returns></returns>
-        internal protected virtual TcpSession CreateSession()
+        protected virtual TcpSession CreateSession()
         {
-            return new TcpSession();
+            return new TcpSession(this);
         }
 
         /// <summary>
@@ -428,8 +467,8 @@ namespace IceCoffee.FastSocket.Tcp
             }
 
             _sessionPool = new TcpSessionPool(CreateSession);
-            _recvSaeaPool = new SaeaPool(OnRecvAsyncCompleted, _options.ReceiveBufferSize);
-            _sendSaeaPool = new SaeaPool(OnSendAsyncCompleted, _options.SendBufferSize);
+            _recvSaeaPool = new ReceiveSaeaPool(OnRecvAsyncCompleted, _options.ReceiveBufferSize);
+            _sendSaeaPool = new SendSaeaPool(OnSendAsyncCompleted);
 
             // 设置接受者事件参数
             _acceptEventArg = new SocketAsyncEventArgs();
@@ -453,6 +492,10 @@ namespace IceCoffee.FastSocket.Tcp
             return true;
         }
 
+        /// <summary>
+        /// 重新启动服务器
+        /// </summary>
+        /// <returns></returns>
         public virtual bool Restart()
         {
             Stop();
@@ -480,12 +523,12 @@ namespace IceCoffee.FastSocket.Tcp
 
             _sessions.Clear();
 
+            _sessionPool.Dispose();
+            _sessionPool = null;
             _recvSaeaPool.Dispose();
             _recvSaeaPool = null;
             _sendSaeaPool.Dispose();
             _sendSaeaPool = null;
-            _sessionPool.Dispose();
-            _sessionPool = null;
             _acceptEventArg.Dispose();
             _acceptEventArg = null;
             _socketAcceptor.Dispose();
@@ -502,35 +545,35 @@ namespace IceCoffee.FastSocket.Tcp
         /// <param name="buffer">Buffer to multicast</param>
         /// <param name="offset">Buffer offset</param>
         /// <param name="size">Buffer size</param>
-        /// <returns>'true' if the data was successfully multicasted, 'false' if the data was not multicasted</returns>
-        public virtual bool Multicast(byte[] buffer, int offset, int size)
+        public virtual void Multicast(byte[] buffer, int offset, int size)
         {
-            if (_isListening == false || size <= 0)
-            {
-                return false;
-            }
-
             // Multicast data to all sessions
             foreach (var session in Sessions.Values)
             {
-                session.SendAsync(buffer, offset, size);
+                SendAsync(session, buffer, offset, size);
             }
-
-            return true;
         }
-        
+
         /// <summary>
         /// 向所有连接的客户端组播数据
         /// </summary>
         /// <param name="buffer">Buffer to multicast</param>
-        /// <returns>'true' if the data was successfully multicasted, 'false' if the data was not multicasted</returns>
-        public virtual bool Multicast(byte[] buffer)
+        public virtual void Multicast(byte[] buffer)
         {
-            return Multicast(buffer, 0, buffer.Length);
+            Multicast(buffer, 0, buffer.Length);
+        }
+
+        public virtual void Multicast(IList<ArraySegment<byte>> bufferList)
+        {
+            // Multicast data to all sessions
+            foreach (var session in Sessions.Values)
+            {
+                SendAsync(session, bufferList);
+            }
         }
         #endregion
 
-        #region 内部方法
+        #region 回收资源
         internal void CollectRecvSaea(SocketAsyncEventArgs e)
         {
             if (_isListening)
@@ -540,6 +583,33 @@ namespace IceCoffee.FastSocket.Tcp
             else
             {
                 e.Dispose();
+            }
+        }
+        private void CollectSendSaea(SocketAsyncEventArgs e)
+        {
+            if (_isListening)
+            {
+                e.SetBuffer(null, 0, 0);
+                e.BufferList = null;
+                _sendSaeaPool.Put(e);
+            }
+            else
+            {
+                e.Dispose();
+            }
+        }
+        private void CollectSession(TcpSession session)
+        {
+            if (_isListening)
+            {
+                _sessions.TryRemove(session.SessionId, out _);
+                session.Close();
+                OnSessionClosed(session);
+                _sessionPool.Put(session);
+            }
+            else
+            {
+                session.Dispose();
             }
         }
         #endregion

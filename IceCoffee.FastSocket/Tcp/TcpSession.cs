@@ -12,7 +12,7 @@ namespace IceCoffee.FastSocket.Tcp
     {
         #region 字段
         internal Socket _socket;
-        private TcpServer _tcpServer;
+        private readonly TcpServer _tcpServer;
         private int _sessionId;
         private DateTime _connectTime;
 
@@ -29,18 +29,18 @@ namespace IceCoffee.FastSocket.Tcp
         public IPEndPoint RemoteIPEndPoint => _socket.RemoteEndPoint as IPEndPoint;
         #endregion 属性
 
-        public TcpSession()
+        public TcpSession(TcpServer tcpServer)
         {
+            _tcpServer = tcpServer;
             ReadBuffer = new ReadBuffer(_tcpServer.CollectRecvSaea, _tcpServer.Options.ReceiveBufferSize);
         }
 
         /// <summary>
         /// 初始化
         /// </summary>
-        internal void Initialize(Socket socket, TcpServer tcpServer, int sessionId)
+        internal void Initialize(Socket socket,  int sessionId)
         {
             _socket = socket;
-            _tcpServer = tcpServer;
             _sessionId = sessionId;
             _connectTime = DateTime.Now;
             OnStarted();
@@ -52,8 +52,8 @@ namespace IceCoffee.FastSocket.Tcp
         /// <param name="buffer"></param>
         /// <returns></returns>
         public virtual void SendAsync(byte[] buffer) 
-        { 
-            SendAsync(buffer, 0, buffer.Length); 
+        {
+            _tcpServer.SendAsync(this, buffer); 
         }
 
         /// <summary>
@@ -65,6 +65,16 @@ namespace IceCoffee.FastSocket.Tcp
         public virtual void SendAsync(byte[] buffer, int offset, int size)
         {
             _tcpServer.SendAsync(this, buffer, offset, size);
+        }
+
+        /// <summary>
+        /// 向客户端发送数据（异步）
+        /// </summary>
+        /// <param name="session"></param>
+        /// <param name="bufferList"></param>
+        public virtual void SendAsync(TcpSession session, IList<ArraySegment<byte>> bufferList)
+        {
+            _tcpServer.SendAsync(this, bufferList);
         }
 
         /// <summary>
