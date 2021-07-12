@@ -18,9 +18,9 @@ namespace UnitTest
             Console.WriteLine("ConnectionStateChanged: " + connectionState);
         }
 
-        protected override void OnException(SocketException socketException)
+        protected override void OnException(Exception exception)
         {
-            Console.WriteLine(socketException);
+            Console.WriteLine(exception);
         }
 
         protected override void OnReceived()

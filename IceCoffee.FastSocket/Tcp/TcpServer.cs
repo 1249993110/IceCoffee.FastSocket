@@ -108,13 +108,20 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         private void StartAccept()
         {
-            // 由于正在重用上下文对象，因此必须清除套接字
-            _acceptEventArg.AcceptSocket = null;
-
-            // 异步接受新的客户端连接
-            if (_socketAcceptor.AcceptAsync(_acceptEventArg) == false)
+            try
             {
-                ProcessAccept();
+                // 由于正在重用上下文对象，因此必须清除套接字
+                _acceptEventArg.AcceptSocket = null;
+
+                // 异步接受新的客户端连接
+                if (_socketAcceptor.AcceptAsync(_acceptEventArg) == false)
+                {
+                    ProcessAccept();
+                }
+            }
+            catch (Exception ex)
+            {
+                RaiseException(ex);
             }
         }
 
@@ -123,55 +130,57 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         private void ProcessAccept()
         {
-            if (_isListening == false)
-            {
-                return;
-            }
-
-            Socket socket = _acceptEventArg.AcceptSocket;
-            SocketError socketError = _acceptEventArg.SocketError;
-
-            // 接受下一个客户端连接
-            Task.Run(StartAccept);
-
-            TcpSession session = null;
-            SocketAsyncEventArgs receiveSaea = null;
             try
             {
-                if (socketError != SocketError.Success)
+                if (_isListening == false)
                 {
-                    throw new SocketException("异常 socket 连接", socketError);
+                    return;
                 }
-                else
+
+                Socket socket = _acceptEventArg.AcceptSocket;
+                SocketError socketError = _acceptEventArg.SocketError;
+
+                // 接受下一个客户端连接
+                Task.Run(StartAccept);
+
+                TcpSession session = null;
+                SocketAsyncEventArgs receiveSaea = null;
+                try
                 {
-                    int sessionId = socket.Handle.ToInt32();
-                    session = _sessionPool.Take();
-                    session.Initialize(socket, sessionId);
-
-                    if(_sessions.TryAdd(sessionId, session) == false)
+                    if (socketError != SocketError.Success)
                     {
-                        throw new SocketException($"添加会话错误，sessionId: {sessionId} 已存在");
+                        throw new SocketException((int)socketError);
                     }
-
-                    OnSessionStarted(session);
-
-                    receiveSaea = _recvSaeaPool.Take();
-                    receiveSaea.UserToken = session;
-                    if (socket.ReceiveAsync(receiveSaea) == false)
+                    else
                     {
-                        ProcessReceive(receiveSaea);
+                        int sessionId = socket.Handle.ToInt32();
+                        session = _sessionPool.Take();
+                        session.Initialize(socket, sessionId);
+
+                        if (_sessions.TryAdd(sessionId, session) == false)
+                        {
+                            throw new Exception($"添加会话错误，sessionId: {sessionId} 已存在");
+                        }
+
+                        OnSessionStarted(session);
+
+                        receiveSaea = _recvSaeaPool.Take();
+                        receiveSaea.UserToken = session;
+                        if (socket.ReceiveAsync(receiveSaea) == false)
+                        {
+                            ProcessReceive(receiveSaea);
+                        }
                     }
                 }
-            }
-            catch (SocketException ex)
-            {
-                RaiseException(ex);
-                ProcessClose(receiveSaea);
+                catch (Exception ex)
+                {
+                    RaiseException(ex);
+                    ProcessClose(receiveSaea);
+                }
             }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in TcpServer.ProcessAccept", ex));
-                ProcessClose(receiveSaea);
+                RaiseException(ex);
             }
         }
 
@@ -196,7 +205,7 @@ namespace IceCoffee.FastSocket.Tcp
 
                 if (socketError != SocketError.Success)
                 {
-                    throw new SocketException("异常 socket 连接", socketError);
+                    throw new SocketException((int)socketError);
                 }
                 else
                 {
@@ -210,10 +219,11 @@ namespace IceCoffee.FastSocket.Tcp
                         session.ReadBuffer.CacheSaea(e);
                         session.OnReceived();
 
-                        // 如果在接收数据中关闭会话
-                        if(session._socket == null)
+                        // 如果在接收数据中关闭会话，这里不需要回收saea 只需回收会话，因为在 ReadBuffer.CacheSaea 中已经回收过 saea
+                        if (session._socket == null)
                         {
-                            ProcessClose(e);
+                            CollectSession(session);
+                            return;
                         }
                         else
                         {
@@ -227,14 +237,9 @@ namespace IceCoffee.FastSocket.Tcp
                     }
                 }
             }
-            catch (SocketException ex)
-            {
-                RaiseException(ex);
-                ProcessClose(e);
-            }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in TcpServer.ProcessReceive", ex));
+                RaiseException(ex);
                 ProcessClose(e);
             }
         }
@@ -251,21 +256,16 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 if (e.SocketError != SocketError.Success)
                 {
-                    throw new SocketException("异常 socket 连接", e.SocketError);
+                    throw new SocketException((int)e.SocketError);
                 }
                 else
                 {
                     CollectSendSaea(e);
                 }
             }
-            catch (SocketException ex)
-            {
-                RaiseException(ex);
-                ProcessClose(e);
-            }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in TcpServer.ProcessSend", ex));
+                RaiseException(ex);
                 ProcessClose(e);
             }
         }
@@ -282,19 +282,26 @@ namespace IceCoffee.FastSocket.Tcp
         /// <param name="count"></param>
         public virtual void SendAsync(TcpSession session, byte[] buffer, int offset, int count)
         {
-            if (_isListening == false || count <= 0)
+            try
             {
-                return;
+                if (_isListening == false || count <= 0)
+                {
+                    return;
+                }
+
+                Socket socket = session._socket;
+                var e = _sendSaeaPool.Take();
+                e.UserToken = session;
+                e.SetBuffer(buffer, offset, count);
+
+                if (socket.SendAsync(e) == false)
+                {
+                    ProcessSend(e);
+                }
             }
-
-            Socket socket = session._socket;
-            var e = _sendSaeaPool.Take();
-            e.UserToken = session;
-            e.SetBuffer(buffer, offset, count);
-
-            if (socket.SendAsync(e) == false)
+            catch (Exception ex)
             {
-                ProcessSend(e);
+                RaiseException(ex);
             }
         }
         /// <summary>
@@ -314,19 +321,26 @@ namespace IceCoffee.FastSocket.Tcp
         /// <param name="bufferList"></param>
         public virtual void SendAsync(TcpSession session, IList<ArraySegment<byte>> bufferList)
         {
-            if (_isListening == false || bufferList.Count <= 0)
+            try
             {
-                return;
+                if (_isListening == false || bufferList.Count <= 0)
+                {
+                    return;
+                }
+
+                Socket socket = session._socket;
+                var e = _sendSaeaPool.Take();
+                e.UserToken = session;
+                e.BufferList = bufferList;
+
+                if (socket.SendAsync(e) == false)
+                {
+                    ProcessSend(e);
+                }
             }
-
-            Socket socket = session._socket;
-            var e = _sendSaeaPool.Take();
-            e.UserToken = session;
-            e.BufferList = bufferList;
-
-            if (socket.SendAsync(e) == false)
+            catch (Exception ex)
             {
-                ProcessSend(e);
+                RaiseException(ex);
             }
         }
         #endregion
@@ -360,36 +374,35 @@ namespace IceCoffee.FastSocket.Tcp
                         break;
                     default:
                         e.Dispose();
-                        throw new SocketException("套接字上完成的最后一个操作不是接收或发送");
+                        throw new ArgumentException("套接字上完成的最后一个操作不是接收或发送");
                 }
-            }
-            catch (SocketException ex)
-            {
-                RaiseException(ex);
             }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in TcpServer.ProcessClose", ex));
+                RaiseException(ex);
             }
         }
 
         /// <summary>
         /// 引发异常
         /// </summary>
-        private void RaiseException(SocketException socketException)
+        private void RaiseException(Exception exception)
         {
-            SocketError error = socketException.SocketError;
-            //跳过断开连接错误 
-            if (error == SocketError.ConnectionAborted
-                || error == SocketError.ConnectionRefused
-                || error == SocketError.ConnectionReset
-                || error == SocketError.OperationAborted
-                || error == SocketError.Shutdown)
+            if(exception is SocketException socketException)
             {
-                return;
+                SocketError error = socketException.SocketErrorCode;
+                //跳过断开连接错误 
+                if (error == SocketError.ConnectionAborted
+                    || error == SocketError.ConnectionRefused
+                    || error == SocketError.ConnectionReset
+                    || error == SocketError.OperationAborted
+                    || error == SocketError.Shutdown)
+                {
+                    return;
+                }
             }
 
-            OnException(socketException);
+            OnException(exception);
         }
         #endregion
 
@@ -397,8 +410,8 @@ namespace IceCoffee.FastSocket.Tcp
         /// <summary>
         /// 当发生非检查异常时调用
         /// </summary>
-        /// <param name="socketException"></param>
-        protected virtual void OnException(SocketException socketException) {  }
+        /// <param name="exception"></param>
+        protected virtual void OnException(Exception exception) {  }
         
         /// <summary>
         /// 创建一个新的套接字接受器对象

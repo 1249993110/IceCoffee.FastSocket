@@ -23,8 +23,8 @@ namespace IceCoffee.FastSocket.Pools
 
             base.Max = int.MaxValue;
 
-            base.IdleTime = 6;
-            base.AllIdleTime = 60;
+            base.IdleTime = 60;
+            base.AllIdleTime = 600;
         }
 
         protected override SocketAsyncEventArgs Create()

@@ -103,17 +103,12 @@ namespace IceCoffee.FastSocket.Tcp
                         ProcessSend(e);
                         break;
                     default:
-                        throw new SocketException("套接字上完成的最后一个操作不是连接、接收或发送");
+                        throw new ArgumentException("套接字上完成的最后一个操作不是连接、接收或发送");
                 }
-            }
-            catch (SocketException ex)
-            {
-                RaiseException(ex);
-                ProcessClose(e);
             }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in OnAsyncCompleted", ex));
+                RaiseException(ex);
                 ProcessClose(e);
             }
         }
@@ -125,7 +120,7 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 if (_connectEventArg.SocketError != SocketError.Success)
                 {
-                    throw new SocketException("异常 socket 连接", _connectEventArg.SocketError);
+                    throw new SocketException((int)_connectEventArg.SocketError);
                 }
                 else
                 {
@@ -139,14 +134,9 @@ namespace IceCoffee.FastSocket.Tcp
                     }
                 }
             }
-            catch (SocketException ex)
-            {
-                RaiseException(ex);
-                ProcessClose(receiveSaea);
-            }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in ProcessConnect", ex));
+                RaiseException(ex);
                 ProcessClose(receiveSaea);
             }
         }
@@ -159,7 +149,7 @@ namespace IceCoffee.FastSocket.Tcp
 
                 if (socketError != SocketError.Success)
                 {
-                    throw new SocketException("异常 socket 连接", socketError);
+                    throw new SocketException((int)socketError);
                 }
                 else
                 {
@@ -173,7 +163,7 @@ namespace IceCoffee.FastSocket.Tcp
                         ReadBuffer.CacheSaea(e);
                         OnReceived();
 
-                        // 如果在接收数据中断开
+                        // 如果在接收数据中断开，直接关闭当前连接
                         if (_connectionState != ConnectionState.Connected)
                         {
                             ProcessClose(e);
@@ -189,14 +179,9 @@ namespace IceCoffee.FastSocket.Tcp
                     }
                 }
             }
-            catch (SocketException ex)
-            {
-                RaiseException(ex);
-                ProcessClose(e);
-            }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in ProcessReceive", ex));
+                RaiseException(ex);
                 ProcessClose(e);
             }
         }
@@ -207,21 +192,16 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 if (e.SocketError != SocketError.Success)
                 {
-                    throw new SocketException("异常 socket 连接", e.SocketError);
+                    throw new SocketException((int)e.SocketError);
                 }
                 else
                 {
                     CollectSendSaea(e);
                 }
             }
-            catch (SocketException ex)
-            {
-                RaiseException(ex);
-                ProcessClose(e);
-            }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in ProcessSend", ex));
+                RaiseException(ex);
                 ProcessClose(e);
             }
         }
@@ -248,29 +228,32 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in ProcessClose", ex));
+                RaiseException(ex);
             }
         }
 
         /// <summary>
         /// 引发异常
         /// </summary>
-        private void RaiseException(SocketException socketException)
+        private void RaiseException(Exception exception)
         {
-            SocketError error = socketException.SocketError;
-            //跳过断开连接错误 
-            if (error == SocketError.ConnectionAborted
-                || error == SocketError.ConnectionRefused
-                || error == SocketError.ConnectionReset
-                || error == SocketError.OperationAborted
-                || error == SocketError.Shutdown)
+            if (exception is SocketException socketException)
             {
-                return;
+                SocketError error = socketException.SocketErrorCode;
+                //跳过断开连接错误 
+                if (error == SocketError.ConnectionAborted
+                    || error == SocketError.ConnectionRefused
+                    || error == SocketError.ConnectionReset
+                    || error == SocketError.OperationAborted
+                    || error == SocketError.Shutdown)
+                {
+                    return;
+                }
             }
 
-            OnException(socketException);
+            OnException(exception);
         }
-        
+
         /// <summary>
         /// 改变连接状态
         /// </summary>
@@ -344,10 +327,10 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 if (_connectionState == ConnectionState.Connecting)
                 {
-                    throw new SocketException("连接尝试超时，或者连接的主机没有响应", new TimeoutException("Connection timeout"));
+                    throw new TimeoutException("连接尝试超时，或者连接的主机没有响应");
                 }
             }
-            catch (SocketException ex)
+            catch (Exception ex)
             {
                 RaiseException(ex);
                 DisconnectAsync();
@@ -360,8 +343,8 @@ namespace IceCoffee.FastSocket.Tcp
         /// <summary>
         /// 当发生非检查异常时调用
         /// </summary>
-        /// <param name="socketException"></param>
-        protected virtual void OnException(SocketException socketException) { }
+        /// <param name="exception"></param>
+        protected virtual void OnException(Exception exception) { }
 
         /// <summary>
         /// 创建一个新的套接字接受器对象
@@ -412,7 +395,7 @@ namespace IceCoffee.FastSocket.Tcp
         {
             if (_connectionState != ConnectionState.Disconnected)
             {
-                throw new SocketException("尝试连接失败，已经连接成功或正在连接或正在断开");
+                throw new Exception("尝试连接失败，已经连接成功或正在连接或正在断开");
             }
 
             ChangeConnectionState(ConnectionState.Connecting);
@@ -451,7 +434,7 @@ namespace IceCoffee.FastSocket.Tcp
         {
             if (_connectionState != ConnectionState.Connected && _connectionState != ConnectionState.Connecting)
             {
-                throw new SocketException("尝试断开失败，未连接成功且未正在连接");
+                throw new Exception("尝试断开失败，未连接成功且未正在连接");
             }
 
             // Cancel connecting operation
@@ -476,7 +459,7 @@ namespace IceCoffee.FastSocket.Tcp
                 _socketConnecter.Shutdown(SocketShutdown.Both);
             }
             catch (SocketException) 
-            { 
+            {
             }
             
             _socketConnecter.Dispose();

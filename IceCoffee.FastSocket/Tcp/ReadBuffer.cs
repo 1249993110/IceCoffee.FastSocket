@@ -291,7 +291,7 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 _collectSaea.Invoke(e);
                 string errorMsg = "读取缓冲区溢出，缓冲区中的字节数大于" + ReadBufferMaxLength;
-                throw new SocketException(errorMsg);
+                throw new Exception(errorMsg);
             }
         }
 

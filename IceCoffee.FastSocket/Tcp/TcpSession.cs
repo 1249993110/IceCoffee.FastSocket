@@ -15,6 +15,7 @@ namespace IceCoffee.FastSocket.Tcp
         private readonly TcpServer _tcpServer;
         private int _sessionId;
         private DateTime _connectedTime;
+        private IPEndPoint _remoteEndPoint;
 
         protected internal readonly ReadBuffer ReadBuffer;
         #endregion
@@ -26,7 +27,7 @@ namespace IceCoffee.FastSocket.Tcp
 
         public DateTime ConnectedTime => _connectedTime;
 
-        public IPEndPoint RemoteIPEndPoint => _socket.RemoteEndPoint as IPEndPoint;
+        public IPEndPoint RemoteIPEndPoint => _remoteEndPoint;
         #endregion 属性
 
         public TcpSession(TcpServer tcpServer)
@@ -43,6 +44,7 @@ namespace IceCoffee.FastSocket.Tcp
             _socket = socket;
             _sessionId = sessionId;
             _connectedTime = DateTime.Now;
+            _remoteEndPoint = socket.RemoteEndPoint as IPEndPoint;
             OnStarted();
         }
 
