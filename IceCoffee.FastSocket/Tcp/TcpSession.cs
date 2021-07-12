@@ -14,9 +14,9 @@ namespace IceCoffee.FastSocket.Tcp
         internal Socket _socket;
         private readonly TcpServer _tcpServer;
         private int _sessionId;
-        private DateTime _connectTime;
+        private DateTime _connectedTime;
 
-        internal protected readonly ReadBuffer ReadBuffer;
+        protected internal readonly ReadBuffer ReadBuffer;
         #endregion
 
         #region 属性
@@ -24,7 +24,7 @@ namespace IceCoffee.FastSocket.Tcp
 
         public int SessionId => _sessionId;
 
-        public DateTime ConnectTime => _connectTime;
+        public DateTime ConnectedTime => _connectedTime;
 
         public IPEndPoint RemoteIPEndPoint => _socket.RemoteEndPoint as IPEndPoint;
         #endregion 属性
@@ -42,7 +42,7 @@ namespace IceCoffee.FastSocket.Tcp
         {
             _socket = socket;
             _sessionId = sessionId;
-            _connectTime = DateTime.Now;
+            _connectedTime = DateTime.Now;
             OnStarted();
         }
 
@@ -82,22 +82,27 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public virtual void Close()
         {
-            if (_socket == null)
+            lock (this)
             {
-                return;
-            }
+                if (_socket == null)
+                {
+                    return;
+                }
 
-            try
-            {
-                _socket.Shutdown(SocketShutdown.Both);
-            }
-            finally
-            {
+                try
+                {
+                    _socket.Shutdown(SocketShutdown.Both);
+                }
+                catch (SocketException) 
+                { 
+                }
+
                 _socket.Close();
-            }
+                ReadBuffer.Clear();
+                OnClosed();
 
-            ReadBuffer.Clear();
-            OnClosed();
+                _socket = null;
+            }
         }
 
         /// <summary>
@@ -112,7 +117,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// <summary>
         /// 收到数据后调用
         /// </summary>
-        internal protected virtual void OnReceived() { }
+        protected internal virtual void OnReceived() { }
 
         #region IDisposable implementation
         /// <summary>

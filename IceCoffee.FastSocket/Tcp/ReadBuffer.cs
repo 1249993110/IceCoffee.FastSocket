@@ -230,7 +230,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// <returns></returns>
         public long IndexOf(byte value)
         {
-            if (_queue.Count == 0)//未找到
+            if (_queue.Count == 0)// 未找到
             {
                 return -1L;
             }
@@ -239,24 +239,24 @@ namespace IceCoffee.FastSocket.Tcp
 
             var firstItem = _queue.Peek();
             resultIndex = Array.IndexOf(firstItem.Buffer, value, _readOffset, firstItem.BytesTransferred - _readOffset);
-            if (resultIndex != -1)//找到
+            if (resultIndex != -1)// 找到
             {
                 return resultIndex - _readOffset;
             }
 
             int tempIndex;
-            resultIndex = firstItem.BytesTransferred - _readOffset;//已查找元素个数
+            resultIndex = firstItem.BytesTransferred - _readOffset;// 已查找元素个数
 
             foreach (var item in _queue)
             {
-                if (item != firstItem)//不是第一个
+                if (item != firstItem)// 不是第一个
                 {
                     tempIndex = Array.IndexOf(item.Buffer, value, 0, item.BytesTransferred);
-                    if (tempIndex != -1)//找到
+                    if (tempIndex != -1)// 找到
                     {
                         return resultIndex + tempIndex;
                     }
-                    else//未找到
+                    else// 未找到
                     {
                         resultIndex += item.BytesTransferred;
                     }

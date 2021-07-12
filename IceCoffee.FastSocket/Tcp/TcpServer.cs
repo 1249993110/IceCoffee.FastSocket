@@ -170,7 +170,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in ProcessAccept", ex));
+                RaiseException(new SocketException("Error in TcpServer.ProcessAccept", ex));
                 ProcessClose(receiveSaea);
             }
         }
@@ -210,24 +210,31 @@ namespace IceCoffee.FastSocket.Tcp
                         session.ReadBuffer.CacheSaea(e);
                         session.OnReceived();
 
-                        SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
-                        receiveSaea.UserToken = session;
-
-                        if (session._socket.ReceiveAsync(receiveSaea) == false)
+                        // 如果在接收数据中关闭会话
+                        if(session._socket == null)
                         {
-                            ProcessReceive(receiveSaea);
+                            ProcessClose(e);
+                        }
+                        else
+                        {
+                            SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
+                            receiveSaea.UserToken = session;
+                            if (session._socket.ReceiveAsync(receiveSaea) == false)
+                            {
+                                ProcessReceive(receiveSaea);
+                            }
                         }
                     }
                 }
             }
-            catch(SocketException ex)
+            catch (SocketException ex)
             {
                 RaiseException(ex);
                 ProcessClose(e);
             }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in ProcessReceive", ex));
+                RaiseException(new SocketException("Error in TcpServer.ProcessReceive", ex));
                 ProcessClose(e);
             }
         }
@@ -258,7 +265,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in ProcessSend", ex));
+                RaiseException(new SocketException("Error in TcpServer.ProcessSend", ex));
                 ProcessClose(e);
             }
         }
@@ -362,7 +369,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                RaiseException(new SocketException("Error in ProcessClose", ex));
+                RaiseException(new SocketException("Error in TcpServer.ProcessClose", ex));
             }
         }
 

@@ -18,6 +18,7 @@ namespace UnitTest
             Console.WriteLine(message);
 
             SendAsync(data);
+            Close();
         }
     }
 }

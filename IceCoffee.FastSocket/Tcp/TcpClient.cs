@@ -173,10 +173,18 @@ namespace IceCoffee.FastSocket.Tcp
                         ReadBuffer.CacheSaea(e);
                         OnReceived();
 
-                        SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
-                        if (_socketConnecter.ReceiveAsync(receiveSaea) == false)
+                        // 如果在接收数据中断开
+                        if (_connectionState != ConnectionState.Connected)
                         {
-                            ProcessReceive(receiveSaea);
+                            ProcessClose(e);
+                        }
+                        else
+                        {
+                            SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
+                            if (_socketConnecter.ReceiveAsync(receiveSaea) == false)
+                            {
+                                ProcessReceive(receiveSaea);
+                            }
                         }
                     }
                 }
@@ -327,11 +335,16 @@ namespace IceCoffee.FastSocket.Tcp
         private CancellationTokenSource _checkConnectionTimeoutCTS;
         private void CheckConnectionTimeout(Task task)
         {
+            if (_checkConnectionTimeoutCTS.IsCancellationRequested)
+            {
+                return;
+            }
+
             try
             {
                 if (_connectionState == ConnectionState.Connecting)
                 {
-                    throw new SocketException("连接尝试超时，或者连接的主机没有响应", new TimeoutException("Connect timeout"));
+                    throw new SocketException("连接尝试超时，或者连接的主机没有响应", new TimeoutException("Connection timeout"));
                 }
             }
             catch (SocketException ex)
@@ -436,10 +449,9 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public void DisconnectAsync()
         {
-            if ((_connectionState != ConnectionState.Connected && _connectionState != ConnectionState.Connecting) 
-                || _connectionState == ConnectionState.Disconnecting)
+            if (_connectionState != ConnectionState.Connected && _connectionState != ConnectionState.Connecting)
             {
-                throw new SocketException("尝试断开失败，未连接成功或未正在连接或正在断开");
+                throw new SocketException("尝试断开失败，未连接成功且未正在连接");
             }
 
             // Cancel connecting operation
@@ -458,6 +470,15 @@ namespace IceCoffee.FastSocket.Tcp
             _sendSaeaPool = null;
             _connectEventArg.Dispose();
             _connectEventArg = null;
+
+            try
+            {
+                _socketConnecter.Shutdown(SocketShutdown.Both);
+            }
+            catch (SocketException) 
+            { 
+            }
+            
             _socketConnecter.Dispose();
             _socketConnecter = null;
 
