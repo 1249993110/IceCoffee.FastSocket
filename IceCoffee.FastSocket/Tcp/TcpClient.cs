@@ -118,8 +118,8 @@ namespace IceCoffee.FastSocket.Tcp
             SocketAsyncEventArgs receiveSaea = null;
             try
             {
-                // 如果在连接中断开
-                if(_connectEventArg == null)
+                // 如果在尝试连接中断开
+                if (_connectEventArg == null)
                 {
                     return;
                 }
@@ -481,7 +481,9 @@ namespace IceCoffee.FastSocket.Tcp
                     _socketConnecter.Dispose();
                     _socketConnecter = null;
                 }
-                catch (ObjectDisposedException) { }
+                catch (ObjectDisposedException) // 如果在尝试连接中断开，即执行了 Socket.CancelConnectAsync
+                { 
+                }
 
                 ChangeConnectionState(ConnectionState.Disconnected);
                 OnDisconnected();
