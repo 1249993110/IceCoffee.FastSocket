@@ -217,9 +217,19 @@ namespace IceCoffee.FastSocket.Tcp
                     else
                     {
                         session.ReadBuffer.CacheSaea(e);
-                        session.OnReceived();
 
-                        // 如果在接收数据中关闭会话，这里不需要回收saea 只需回收会话，因为在 ReadBuffer.CacheSaea 中已经回收过 saea
+                        // 如果在接收数据中出现异常，则不需要回收saea 只需回收会话，因为在 ReadBuffer.CacheSaea 中已经回收过 saea
+                        try
+                        {
+                            session.OnReceived();
+                        }
+                        catch (Exception ex)
+                        {
+                            RaiseException(ex);
+                            CollectSession(session);
+                        }
+
+                        // 如果在接收数据中关闭会话，则不需要回收saea 只需回收会话，因为在 ReadBuffer.CacheSaea 中已经回收过 saea
                         if (session._socket == null)
                         {
                             CollectSession(session);
@@ -481,35 +491,38 @@ namespace IceCoffee.FastSocket.Tcp
         /// <returns>'true' 如果服务器启动成功, 'false' 如果服务器启动失败</returns>
         public virtual bool Start()
         {
-            if (_isListening)
+            lock (this)
             {
-                return false;
+                if (_isListening)
+                {
+                    return false;
+                }
+
+                _sessionPool = new TcpSessionPool(CreateSession);
+                _recvSaeaPool = new ReceiveSaeaPool(OnRecvAsyncCompleted, _options.ReceiveBufferSize);
+                _sendSaeaPool = new SendSaeaPool(OnSendAsyncCompleted);
+
+                // 设置接受者事件参数
+                _acceptEventArg = new SocketAsyncEventArgs();
+                _acceptEventArg.Completed += OnAcceptAsyncCompleted;
+
+                // 创建一个新的套接字接受器
+                _socketAcceptor = CreateSocketAcceptor();
+                // 将接受者套接字绑定到 IP 终结点
+                _socketAcceptor.Bind(_endPoint);
+                // 根据创建的实际端点刷新端点属性
+                _endPoint = (IPEndPoint)_socketAcceptor.LocalEndPoint;
+                // 开始侦听具有给定操作系统 TCP 缓存大小的接受者套接字
+                _socketAcceptor.Listen(_options.AcceptorBacklog);
+
+                _isListening = true;
+                OnStarted();
+
+                // 开始接受客户端
+                StartAccept();
+
+                return true;
             }
-
-            _sessionPool = new TcpSessionPool(CreateSession);
-            _recvSaeaPool = new ReceiveSaeaPool(OnRecvAsyncCompleted, _options.ReceiveBufferSize);
-            _sendSaeaPool = new SendSaeaPool(OnSendAsyncCompleted);
-
-            // 设置接受者事件参数
-            _acceptEventArg = new SocketAsyncEventArgs();
-            _acceptEventArg.Completed += OnAcceptAsyncCompleted;
-
-            // 创建一个新的套接字接受器
-            _socketAcceptor = CreateSocketAcceptor();
-            // 将接受者套接字绑定到 IP 终结点
-            _socketAcceptor.Bind(_endPoint);
-            // 根据创建的实际端点刷新端点属性
-            _endPoint = (IPEndPoint)_socketAcceptor.LocalEndPoint;
-            // 开始侦听具有给定操作系统 TCP 缓存大小的接受者套接字
-            _socketAcceptor.Listen(_options.AcceptorBacklog);
-
-            _isListening = true;
-            OnStarted();
-
-            // 开始接受客户端
-            StartAccept();
-
-            return true;
         }
 
         /// <summary>
@@ -527,36 +540,39 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public virtual bool Stop()
         {
-            if (_isListening == false)
+            lock (this)
             {
-                return false;
+                if (_isListening == false)
+                {
+                    return false;
+                }
+
+                _isListening = false;
+
+                foreach (var item in _sessions)
+                {
+                    var session = item.Value;
+                    session.Dispose();
+                    OnSessionClosed(session);
+                }
+
+                _sessions.Clear();
+
+                _sessionPool.Dispose();
+                _sessionPool = null;
+                _recvSaeaPool.Dispose();
+                _recvSaeaPool = null;
+                _sendSaeaPool.Dispose();
+                _sendSaeaPool = null;
+                _acceptEventArg.Dispose();
+                _acceptEventArg = null;
+                _socketAcceptor.Dispose();
+                _socketAcceptor = null;
+
+                OnStopped();
+
+                return true;
             }
-
-            _isListening = false;
-
-            foreach (var item in _sessions)
-            {
-                var session = item.Value;
-                session.Dispose();
-                OnSessionClosed(session);
-            }
-
-            _sessions.Clear();
-
-            _sessionPool.Dispose();
-            _sessionPool = null;
-            _recvSaeaPool.Dispose();
-            _recvSaeaPool = null;
-            _sendSaeaPool.Dispose();
-            _sendSaeaPool = null;
-            _acceptEventArg.Dispose();
-            _acceptEventArg = null;
-            _socketAcceptor.Dispose();
-            _socketAcceptor = null;
-
-            OnStopped();
-
-            return true;
         }
 
         /// <summary>

@@ -118,6 +118,12 @@ namespace IceCoffee.FastSocket.Tcp
             SocketAsyncEventArgs receiveSaea = null;
             try
             {
+                // 如果在连接中断开
+                if(_connectEventArg == null)
+                {
+                    return;
+                }
+
                 if (_connectEventArg.SocketError != SocketError.Success)
                 {
                     throw new SocketException((int)_connectEventArg.SocketError);
@@ -318,13 +324,13 @@ namespace IceCoffee.FastSocket.Tcp
         private CancellationTokenSource _checkConnectionTimeoutCTS;
         private void CheckConnectionTimeout(Task task)
         {
-            if (_checkConnectionTimeoutCTS.IsCancellationRequested)
-            {
-                return;
-            }
-
             try
             {
+                if (_checkConnectionTimeoutCTS == null || _checkConnectionTimeoutCTS.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 if (_connectionState == ConnectionState.Connecting)
                 {
                     throw new TimeoutException("连接尝试超时，或者连接的主机没有响应");
@@ -393,28 +399,31 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public void ConnectAsync()
         {
-            if (_connectionState != ConnectionState.Disconnected)
+            lock (this)
             {
-                throw new Exception("尝试连接失败，已经连接成功或正在连接或正在断开");
-            }
+                if (_connectionState != ConnectionState.Disconnected)
+                {
+                    throw new Exception("尝试连接失败，已经连接成功或正在连接或正在断开");
+                }
 
-            ChangeConnectionState(ConnectionState.Connecting);
+                ChangeConnectionState(ConnectionState.Connecting);
 
-            _recvSaeaPool = new ReceiveSaeaPool(OnAsyncCompleted, _options.ReceiveBufferSize);
-            _sendSaeaPool = new SendSaeaPool(OnAsyncCompleted);
+                _recvSaeaPool = new ReceiveSaeaPool(OnAsyncCompleted, _options.ReceiveBufferSize);
+                _sendSaeaPool = new SendSaeaPool(OnAsyncCompleted);
 
-            _connectEventArg = new SocketAsyncEventArgs();
-            _connectEventArg.Completed += OnAsyncCompleted;
-            _connectEventArg.RemoteEndPoint = _remoteEndpoint;
+                _connectEventArg = new SocketAsyncEventArgs();
+                _connectEventArg.Completed += OnAsyncCompleted;
+                _connectEventArg.RemoteEndPoint = _remoteEndpoint;
 
-            _socketConnecter = CreateSocketConnecter();
+                _socketConnecter = CreateSocketConnecter();
 
-            _checkConnectionTimeoutCTS = new CancellationTokenSource();
-            Task.Delay(_options.ConnectionTimeout, _checkConnectionTimeoutCTS.Token).ContinueWith(CheckConnectionTimeout, _checkConnectionTimeoutCTS.Token);
+                _checkConnectionTimeoutCTS = new CancellationTokenSource();
+                Task.Delay(_options.ConnectionTimeout, _checkConnectionTimeoutCTS.Token).ContinueWith(CheckConnectionTimeout, _checkConnectionTimeoutCTS.Token);
 
-            if (_socketConnecter.ConnectAsync(_connectEventArg) == false)
-            {
-                ProcessConnect();
+                if (_socketConnecter.ConnectAsync(_connectEventArg) == false)
+                {
+                    ProcessConnect();
+                }
             }
         }
 
@@ -432,41 +441,51 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public void DisconnectAsync()
         {
-            if (_connectionState != ConnectionState.Connected && _connectionState != ConnectionState.Connecting)
+            lock (this)
             {
-                throw new Exception("尝试断开失败，未连接成功且未正在连接");
+                if (_connectionState != ConnectionState.Connected && _connectionState != ConnectionState.Connecting)
+                {
+                    throw new Exception("尝试断开失败，未连接成功且未正在连接");
+                }
+
+                // Cancel connecting operation
+                if (_connectionState == ConnectionState.Connecting)
+                {
+                    Socket.CancelConnectAsync(_connectEventArg);
+                    _checkConnectionTimeoutCTS.Cancel(false);
+                }
+
+                ChangeConnectionState(ConnectionState.Disconnecting);
+
+                _checkConnectionTimeoutCTS.Dispose();
+                _checkConnectionTimeoutCTS = null;
+
+                ReadBuffer.Clear();
+                _recvSaeaPool.Dispose();
+                _recvSaeaPool = null;
+                _sendSaeaPool.Dispose();
+                _sendSaeaPool = null;
+                _connectEventArg.Dispose();
+                _connectEventArg = null;
+
+                try
+                {
+                    try
+                    {
+                        _socketConnecter.Shutdown(SocketShutdown.Both);
+                    }
+                    catch (SocketException)
+                    {
+                    }
+
+                    _socketConnecter.Dispose();
+                    _socketConnecter = null;
+                }
+                catch (ObjectDisposedException) { }
+
+                ChangeConnectionState(ConnectionState.Disconnected);
+                OnDisconnected();
             }
-
-            // Cancel connecting operation
-            if (_connectionState == ConnectionState.Connecting)
-            {
-                Socket.CancelConnectAsync(_connectEventArg);
-                _checkConnectionTimeoutCTS.Cancel(false);
-            }
-
-            ChangeConnectionState(ConnectionState.Disconnecting);
-
-            ReadBuffer.Clear();
-            _recvSaeaPool.Dispose();
-            _recvSaeaPool = null;
-            _sendSaeaPool.Dispose();
-            _sendSaeaPool = null;
-            _connectEventArg.Dispose();
-            _connectEventArg = null;
-
-            try
-            {
-                _socketConnecter.Shutdown(SocketShutdown.Both);
-            }
-            catch (SocketException) 
-            {
-            }
-            
-            _socketConnecter.Dispose();
-            _socketConnecter = null;
-
-            ChangeConnectionState(ConnectionState.Disconnected);
-            OnDisconnected();
         }
 
         #endregion

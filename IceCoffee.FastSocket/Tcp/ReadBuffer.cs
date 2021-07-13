@@ -213,7 +213,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// <returns></returns>
         public byte[] ReadLine()
         {
-            if (_newlineIndex == -1)//读取前没有调用CanReadLine
+            if (_newlineIndex == -1)// 读取前没有调用CanReadLine
             {
                 return Read(IndexOf(10) + 1);
             }
@@ -300,13 +300,22 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         internal void Clear()
         {
-            while (_queue.Count > 0)
+            try
             {
-                var e = _queue.Dequeue();
-                _collectSaea.Invoke(e);
+                while (_queue.Count > 0)
+                {
+                    var e = _queue.Dequeue();
+                    _collectSaea.Invoke(e);
+                }
             }
-
-            ResetField();
+            catch (Exception)
+            {
+                throw;
+            }
+            finally
+            {
+                ResetField();
+            }
         }
 
         /// <summary>
