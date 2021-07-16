@@ -12,7 +12,7 @@ namespace IceCoffee.FastSocket.Tcp
     public enum ConnectionState
     {
         /// <summary>
-        /// 未连接
+        /// 未连接或已经断开
         /// </summary>
         Disconnected,
 

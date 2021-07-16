@@ -72,9 +72,8 @@ namespace IceCoffee.FastSocket.Tcp
         /// <summary>
         /// 向客户端发送数据（异步）
         /// </summary>
-        /// <param name="session"></param>
         /// <param name="bufferList"></param>
-        public virtual void SendAsync(TcpSession session, IList<ArraySegment<byte>> bufferList)
+        public virtual void SendAsync(IList<ArraySegment<byte>> bufferList)
         {
             _tcpServer.SendAsync(this, bufferList);
         }

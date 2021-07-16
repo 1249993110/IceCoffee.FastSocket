@@ -321,19 +321,14 @@ namespace IceCoffee.FastSocket.Tcp
         #endregion
 
         #region Check connection timeout
-        private CancellationTokenSource _checkConnectionTimeoutCTS;
-        private void CheckConnectionTimeout(Task task)
+        private System.Timers.Timer _connectionTimeoutChecker;
+        private void CheckConnectionTimeout(object sender, System.Timers.ElapsedEventArgs e)
         {
             try
             {
-                if (_checkConnectionTimeoutCTS == null || _checkConnectionTimeoutCTS.IsCancellationRequested)
-                {
-                    return;
-                }
-
                 if (_connectionState == ConnectionState.Connecting)
                 {
-                    throw new TimeoutException("连接尝试超时，或者连接的主机没有响应");
+                    throw new TimeoutException("连接超时，或者连接的主机没有响应");
                 }
             }
             catch (Exception ex)
@@ -417,8 +412,10 @@ namespace IceCoffee.FastSocket.Tcp
 
                 _socketConnecter = CreateSocketConnecter();
 
-                _checkConnectionTimeoutCTS = new CancellationTokenSource();
-                Task.Delay(_options.ConnectionTimeout, _checkConnectionTimeoutCTS.Token).ContinueWith(CheckConnectionTimeout, _checkConnectionTimeoutCTS.Token);
+                _connectionTimeoutChecker = new System.Timers.Timer(_options.ConnectionTimeout);
+                _connectionTimeoutChecker.Elapsed += CheckConnectionTimeout;
+                _connectionTimeoutChecker.AutoReset = false;
+                _connectionTimeoutChecker.Start();
 
                 if (_socketConnecter.ConnectAsync(_connectEventArg) == false)
                 {
@@ -443,22 +440,23 @@ namespace IceCoffee.FastSocket.Tcp
         {
             lock (this)
             {
-                if (_connectionState != ConnectionState.Connected && _connectionState != ConnectionState.Connecting)
-                {
-                    throw new Exception("尝试断开失败，未连接成功且未正在连接");
-                }
-
                 // Cancel connecting operation
                 if (_connectionState == ConnectionState.Connecting)
                 {
                     Socket.CancelConnectAsync(_connectEventArg);
-                    _checkConnectionTimeoutCTS.Cancel(false);
+                }
+                else if (_connectionState == ConnectionState.Connected)
+                {
+                    ChangeConnectionState(ConnectionState.Disconnecting);
+                }
+                else
+                {
+                    throw new Exception("尝试断开失败，未连接成功且未正在连接");
                 }
 
-                ChangeConnectionState(ConnectionState.Disconnecting);
-
-                _checkConnectionTimeoutCTS.Dispose();
-                _checkConnectionTimeoutCTS = null;
+                _connectionTimeoutChecker.Stop();
+                _connectionTimeoutChecker.Dispose();
+                _connectionTimeoutChecker = null;
 
                 ReadBuffer.Clear();
                 _recvSaeaPool.Dispose();

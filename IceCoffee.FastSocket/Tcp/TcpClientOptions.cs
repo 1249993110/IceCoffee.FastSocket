@@ -35,8 +35,11 @@ namespace IceCoffee.FastSocket.Tcp
         public bool NoDelay { get; set; } = false;
 
         /// <summary>
-        /// 连接超时
+        /// 连接超时时长（单位：毫秒）
         /// </summary>
-        public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(5);
+        /// <remarks>
+        /// 默认值：5000 毫秒
+        /// </remarks>
+        public double ConnectionTimeout { get; set; } = 5000D;
     }
 }

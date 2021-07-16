@@ -599,6 +599,10 @@ namespace IceCoffee.FastSocket.Tcp
             Multicast(buffer, 0, buffer.Length);
         }
 
+        /// <summary>
+        /// 向所有连接的客户端组播数据
+        /// </summary>
+        /// <param name="bufferList"></param>
         public virtual void Multicast(IList<ArraySegment<byte>> bufferList)
         {
             // Multicast data to all sessions
