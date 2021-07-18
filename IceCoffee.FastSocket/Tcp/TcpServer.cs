@@ -154,7 +154,7 @@ namespace IceCoffee.FastSocket.Tcp
                     else
                     {
                         int sessionId = socket.Handle.ToInt32();
-                        session = _sessionPool.Take();
+                        session = _sessionPool.Get();
                         session.Initialize(socket, sessionId);
 
                         if (_sessions.TryAdd(sessionId, session) == false)
@@ -164,7 +164,7 @@ namespace IceCoffee.FastSocket.Tcp
 
                         OnSessionStarted(session);
 
-                        receiveSaea = _recvSaeaPool.Take();
+                        receiveSaea = _recvSaeaPool.Get();
                         receiveSaea.UserToken = session;
                         if (socket.ReceiveAsync(receiveSaea) == false)
                         {
@@ -237,7 +237,7 @@ namespace IceCoffee.FastSocket.Tcp
                         }
                         else
                         {
-                            SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
+                            SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Get();
                             receiveSaea.UserToken = session;
                             if (session._socket.ReceiveAsync(receiveSaea) == false)
                             {
@@ -300,7 +300,7 @@ namespace IceCoffee.FastSocket.Tcp
                 }
 
                 Socket socket = session._socket;
-                var e = _sendSaeaPool.Take();
+                var e = _sendSaeaPool.Get();
                 e.UserToken = session;
                 e.SetBuffer(buffer, offset, count);
 
@@ -339,7 +339,7 @@ namespace IceCoffee.FastSocket.Tcp
                 }
 
                 Socket socket = session._socket;
-                var e = _sendSaeaPool.Take();
+                var e = _sendSaeaPool.Get();
                 e.UserToken = session;
                 e.BufferList = bufferList;
 
@@ -618,7 +618,7 @@ namespace IceCoffee.FastSocket.Tcp
         {
             if (_isListening)
             {
-                _recvSaeaPool.Put(e);
+                _recvSaeaPool.Return(e);
             }
             else
             {
@@ -631,7 +631,7 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 e.SetBuffer(null, 0, 0);
                 e.BufferList = null;
-                _sendSaeaPool.Put(e);
+                _sendSaeaPool.Return(e);
             }
             else
             {
@@ -645,7 +645,7 @@ namespace IceCoffee.FastSocket.Tcp
                 _sessions.TryRemove(session.SessionId, out _);
                 session.Close();
                 OnSessionClosed(session);
-                _sessionPool.Put(session);
+                _sessionPool.Return(session);
             }
             else
             {

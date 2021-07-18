@@ -4,24 +4,13 @@ using System.Net.Sockets;
 
 namespace IceCoffee.FastSocket.Pools
 {
-    internal class SendSaeaPool : ConnectionPool<SocketAsyncEventArgs>
+    internal class SendSaeaPool : ConcurrentBagPool<SocketAsyncEventArgs>
     {
         private readonly EventHandler<SocketAsyncEventArgs> _asyncCompletedEventHandler;
 
         public SendSaeaPool(EventHandler<SocketAsyncEventArgs> asyncCompletedEventHandler)
         {
             this._asyncCompletedEventHandler = asyncCompletedEventHandler;
-
-            base.Min = Environment.ProcessorCount;
-            if (base.Min < 2)
-            {
-                base.Min = 2;
-            }
-
-            base.Max = int.MaxValue;
-
-            base.IdleTime = 60;
-            base.AllIdleTime = 600;
         }
 
         protected override SocketAsyncEventArgs Create()

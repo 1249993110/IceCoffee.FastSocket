@@ -133,7 +133,7 @@ namespace IceCoffee.FastSocket.Tcp
                     ChangeConnectionState(ConnectionState.Connected);
                     OnConnected();
 
-                    receiveSaea = _recvSaeaPool.Take();
+                    receiveSaea = _recvSaeaPool.Get();
                     if (_socketConnecter.ReceiveAsync(receiveSaea) == false)
                     {
                         ProcessReceive(receiveSaea);
@@ -176,7 +176,7 @@ namespace IceCoffee.FastSocket.Tcp
                         }
                         else
                         {
-                            SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Take();
+                            SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Get();
                             if (_socketConnecter.ReceiveAsync(receiveSaea) == false)
                             {
                                 ProcessReceive(receiveSaea);
@@ -284,7 +284,7 @@ namespace IceCoffee.FastSocket.Tcp
                 return;
             }
 
-            var e = _sendSaeaPool.Take();
+            var e = _sendSaeaPool.Get();
             e.SetBuffer(buffer, offset, count);
             if (_socketConnecter.SendAsync(e) == false)
             {
@@ -311,7 +311,7 @@ namespace IceCoffee.FastSocket.Tcp
                 return;
             }
 
-            var e = _sendSaeaPool.Take();
+            var e = _sendSaeaPool.Get();
             e.BufferList = bufferList;
             if (_socketConnecter.SendAsync(e) == false)
             {
@@ -495,7 +495,7 @@ namespace IceCoffee.FastSocket.Tcp
         {
             if (_connectionState == ConnectionState.Connected)
             {
-                _recvSaeaPool.Put(e);
+                _recvSaeaPool.Return(e);
             }
             else
             {
@@ -508,7 +508,7 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 e.SetBuffer(null, 0, 0);
                 e.BufferList = null;
-                _sendSaeaPool.Put(e);
+                _sendSaeaPool.Return(e);
             }
             else
             {
