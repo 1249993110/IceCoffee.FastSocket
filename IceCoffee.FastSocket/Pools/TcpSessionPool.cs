@@ -6,16 +6,16 @@ namespace IceCoffee.FastSocket.Pools
 {
     internal class TcpSessionPool : ConcurrentBagPool<TcpSession>
     {
-        private readonly Func<TcpSession> _createSessionFunc;
+        private readonly Func<TcpSession> _createCallback;
 
-        public TcpSessionPool(Func<TcpSession> createSessionFunc)
+        public TcpSessionPool(Func<TcpSession> createCallback)
         {
-            _createSessionFunc = createSessionFunc;
+            _createCallback = createCallback;
         }
 
         protected override TcpSession Create()
         {
-            return _createSessionFunc.Invoke();
+            return _createCallback.Invoke();
         }
     }
 }

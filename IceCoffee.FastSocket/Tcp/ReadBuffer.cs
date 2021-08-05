@@ -98,23 +98,23 @@ namespace IceCoffee.FastSocket.Tcp
         public byte[] Read(long maxSize = 0)
         {
             _newlineIndex = -1;
-            if (_queue.Count == 0 || maxSize <= 0)//缓冲区为空
+            if (_queue.Count == 0 || maxSize <= 0)// 缓冲区为空
             {
                 return new byte[0];
             }
-            else if (_bytesAvailable <= maxSize)//移除所有
+            else if (_bytesAvailable <= maxSize)// 移除所有
             {
                 return ReadAll();
             }
-            else//移除部分,此时队列中应至少有1个saea
+            else// 移除部分,此时队列中应至少有1个saea
             {
                 byte[] result = new byte[maxSize];
-                long alreadyRemoveCount = 0, willRemoveCount = 0;//已移除大小 将移除大小
+                long alreadyRemoveCount = 0;// 已移除大小 
 
                 SocketAsyncEventArgs saea = _queue.Peek();
-                willRemoveCount = saea.BytesTransferred - _readOffset;//第一个buffer的大小
+                long willRemoveCount = saea.BytesTransferred - _readOffset;// 将移除大小，第一个buffer的大小
 
-                if (willRemoveCount > maxSize)//截取第一个saea的部分即可
+                if (willRemoveCount > maxSize)// 截取第一个saea的部分即可
                 {
                     Array.Copy(saea.Buffer, _readOffset, result, 0, maxSize);
                     _readOffset += (int)maxSize;
@@ -127,7 +127,7 @@ namespace IceCoffee.FastSocket.Tcp
                 alreadyRemoveCount += willRemoveCount;
                 _readOffset = 0;
                 _collectSaea.Invoke(saea);
-                if (alreadyRemoveCount == maxSize)//取第一个saea全部即可
+                if (alreadyRemoveCount == maxSize)// 取第一个saea全部即可
                 {
                     return result;
                 }

@@ -24,12 +24,12 @@ namespace IceCoffee.FastSocket.Tcp
         private readonly TcpServerOptions _options;
 
         private readonly ConcurrentDictionary<int, TcpSession> _sessions;
-
-        private TcpSessionPool _sessionPool;
-        private ReceiveSaeaPool _recvSaeaPool;
-        private SendSaeaPool _sendSaeaPool;
+       
         private SocketAsyncEventArgs _acceptEventArg;
         private Socket _socketAcceptor;
+        private TcpSessionPool _sessionPool;
+        private TcpReceiveSaeaPool _recvSaeaPool;
+        private SaeaPool _sendSaeaPool;
         #endregion
 
         #region 属性
@@ -414,6 +414,20 @@ namespace IceCoffee.FastSocket.Tcp
 
             OnException(exception);
         }
+
+        private SocketAsyncEventArgs CreateRecvSaea()
+        {
+            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+            saea.Completed += OnRecvAsyncCompleted;
+            saea.SetBuffer(new byte[_options.ReceiveBufferSize], 0, _options.ReceiveBufferSize);
+            return saea;
+        }
+        private SocketAsyncEventArgs CreateSendSaea()
+        {
+            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+            saea.Completed += OnSendAsyncCompleted;
+            return saea;
+        }
         #endregion
 
         #region 保护方法
@@ -498,10 +512,6 @@ namespace IceCoffee.FastSocket.Tcp
                     return false;
                 }
 
-                _sessionPool = new TcpSessionPool(CreateSession);
-                _recvSaeaPool = new ReceiveSaeaPool(OnRecvAsyncCompleted, _options.ReceiveBufferSize);
-                _sendSaeaPool = new SendSaeaPool(OnSendAsyncCompleted);
-
                 // 设置接受者事件参数
                 _acceptEventArg = new SocketAsyncEventArgs();
                 _acceptEventArg.Completed += OnAcceptAsyncCompleted;
@@ -514,6 +524,10 @@ namespace IceCoffee.FastSocket.Tcp
                 _endPoint = (IPEndPoint)_socketAcceptor.LocalEndPoint;
                 // 开始侦听具有给定操作系统 TCP 缓存大小的接受者套接字
                 _socketAcceptor.Listen(_options.AcceptorBacklog);
+
+                _sessionPool = new TcpSessionPool(CreateSession);
+                _recvSaeaPool = new TcpReceiveSaeaPool(CreateRecvSaea);
+                _sendSaeaPool = new SaeaPool(CreateSendSaea);
 
                 _isListening = true;
                 OnStarted();
@@ -616,40 +630,61 @@ namespace IceCoffee.FastSocket.Tcp
         #region 回收资源
         internal void CollectRecvSaea(SocketAsyncEventArgs e)
         {
-            if (_isListening)
+            try
             {
-                _recvSaeaPool.Return(e);
+                if (_isListening)
+                {
+                    _recvSaeaPool.Return(e);
+                }
+                else
+                {
+                    e.Dispose();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                e.Dispose();
+                RaiseException(ex);
             }
         }
         private void CollectSendSaea(SocketAsyncEventArgs e)
         {
-            if (_isListening)
+            try
             {
-                e.SetBuffer(null, 0, 0);
-                e.BufferList = null;
-                _sendSaeaPool.Return(e);
+                if (_isListening)
+                {
+                    e.SetBuffer(null, 0, 0);
+                    e.BufferList = null;
+                    _sendSaeaPool.Return(e);
+                }
+                else
+                {
+                    e.Dispose();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                e.Dispose();
+                RaiseException(ex);
             }
         }
         private void CollectSession(TcpSession session)
         {
-            if (_isListening)
+            try
             {
-                _sessions.TryRemove(session.SessionId, out _);
-                session.Close();
-                OnSessionClosed(session);
-                _sessionPool.Return(session);
+                if (_isListening)
+                {
+                    _sessions.TryRemove(session.SessionId, out _);
+                    session.Close();
+                    OnSessionClosed(session);
+                    _sessionPool.Return(session);
+                }
+                else
+                {
+                    session.Dispose();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                session.Dispose();
+                RaiseException(ex);
             }
         }
         #endregion

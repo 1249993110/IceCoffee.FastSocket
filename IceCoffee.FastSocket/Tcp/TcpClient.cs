@@ -20,8 +20,8 @@ namespace IceCoffee.FastSocket.Tcp
 
         protected readonly ReadBuffer ReadBuffer;
 
-        private ReceiveSaeaPool _recvSaeaPool;
-        private SendSaeaPool _sendSaeaPool;
+        private TcpReceiveSaeaPool _recvSaeaPool;
+        private SaeaPool _sendSaeaPool;
         private SocketAsyncEventArgs _connectEventArg;
         private Socket _socketConnecter;
         #endregion
@@ -66,7 +66,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// <summary>
         /// 使用给定的 host 和端口号初始化 TCP 客户端
         /// </summary>
-        /// <param name="host">IP address</param>
+        /// <param name="host">Host</param>
         /// <param name="port">Port number</param>
         /// <param name="options">Tcp client options</param>
         public TcpClient(string host, int port, TcpClientOptions options = null) : this(new DnsEndPoint(host, port), options) { }
@@ -279,16 +279,23 @@ namespace IceCoffee.FastSocket.Tcp
         /// <param name="count"></param>
         public virtual void SendAsync(byte[] buffer, int offset, int count)
         {
-            if (_connectionState != ConnectionState.Connected || count <= 0)
+            try
             {
-                return;
-            }
+                if (_connectionState != ConnectionState.Connected || count <= 0)
+                {
+                    return;
+                }
 
-            var e = _sendSaeaPool.Get();
-            e.SetBuffer(buffer, offset, count);
-            if (_socketConnecter.SendAsync(e) == false)
+                var e = _sendSaeaPool.Get();
+                e.SetBuffer(buffer, offset, count);
+                if (_socketConnecter.SendAsync(e) == false)
+                {
+                    ProcessSend(e);
+                }
+            }
+            catch (Exception ex)
             {
-                ProcessSend(e);
+                RaiseException(ex);
             }
         }
         /// <summary>
@@ -306,16 +313,23 @@ namespace IceCoffee.FastSocket.Tcp
         /// <param name="bufferList"></param>
         public virtual void SendAsync(IList<ArraySegment<byte>> bufferList)
         {
-            if (_connectionState != ConnectionState.Connected || bufferList.Count <= 0)
+            try
             {
-                return;
-            }
+                if (_connectionState != ConnectionState.Connected || bufferList.Count <= 0)
+                {
+                    return;
+                }
 
-            var e = _sendSaeaPool.Get();
-            e.BufferList = bufferList;
-            if (_socketConnecter.SendAsync(e) == false)
+                var e = _sendSaeaPool.Get();
+                e.BufferList = bufferList;
+                if (_socketConnecter.SendAsync(e) == false)
+                {
+                    ProcessSend(e);
+                }
+            }
+            catch (Exception ex)
             {
-                ProcessSend(e);
+                RaiseException(ex);
             }
         }
         #endregion
@@ -338,6 +352,20 @@ namespace IceCoffee.FastSocket.Tcp
             }
         }
         #endregion
+
+        private SocketAsyncEventArgs CreateRecvSaea()
+        {
+            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+            saea.Completed += OnAsyncCompleted;
+            saea.SetBuffer(new byte[_options.ReceiveBufferSize], 0, _options.ReceiveBufferSize);
+            return saea;
+        }
+        private SocketAsyncEventArgs CreateSendSaea()
+        {
+            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+            saea.Completed += OnAsyncCompleted;
+            return saea;
+        }
         #endregion
 
         #region 保护方法
@@ -348,7 +376,7 @@ namespace IceCoffee.FastSocket.Tcp
         protected virtual void OnException(Exception exception) { }
 
         /// <summary>
-        /// 创建一个新的套接字接受器对象
+        /// 创建一个新的套接字对象
         /// </summary>
         /// <remarks>
         /// 如果您需要在您的实现中准备一些特定的套接字对象，则方法可能会被覆盖
@@ -367,12 +395,12 @@ namespace IceCoffee.FastSocket.Tcp
         }
 
         /// <summary>
-        /// 连接成功时调用
+        /// 连接成功后调用
         /// </summary>
         protected virtual void OnConnected() {  }
 
         /// <summary>
-        /// 断开连接时调用
+        /// 断开连接后调用
         /// </summary>
         protected virtual void OnDisconnected() { }
 
@@ -382,7 +410,7 @@ namespace IceCoffee.FastSocket.Tcp
         protected virtual void OnReceived() { }
 
         /// <summary>
-        /// 连接状态改变时调用
+        /// 连接状态改变后调用
         /// </summary>
         /// <param name="connectionState"></param>
         protected virtual void OnConnectionStateChanged(ConnectionState connectionState) { }
@@ -403,14 +431,14 @@ namespace IceCoffee.FastSocket.Tcp
 
                 ChangeConnectionState(ConnectionState.Connecting);
 
-                _recvSaeaPool = new ReceiveSaeaPool(OnAsyncCompleted, _options.ReceiveBufferSize);
-                _sendSaeaPool = new SendSaeaPool(OnAsyncCompleted);
-
                 _connectEventArg = new SocketAsyncEventArgs();
                 _connectEventArg.Completed += OnAsyncCompleted;
                 _connectEventArg.RemoteEndPoint = _remoteEndpoint;
 
                 _socketConnecter = CreateSocketConnecter();
+
+                _recvSaeaPool = new TcpReceiveSaeaPool(CreateRecvSaea);
+                _sendSaeaPool = new SaeaPool(CreateSendSaea);
 
                 _connectionTimeoutChecker = new System.Timers.Timer(_options.ConnectionTimeout);
                 _connectionTimeoutChecker.Elapsed += CheckConnectionTimeout;
@@ -493,26 +521,40 @@ namespace IceCoffee.FastSocket.Tcp
         #region 回收资源
         internal void CollectRecvSaea(SocketAsyncEventArgs e)
         {
-            if (_connectionState == ConnectionState.Connected)
+            try
             {
-                _recvSaeaPool.Return(e);
+                if (_connectionState == ConnectionState.Connected)
+                {
+                    _recvSaeaPool.Return(e);
+                }
+                else
+                {
+                    e.Dispose();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                e.Dispose();
+                RaiseException(ex);
             }
         }
         private void CollectSendSaea(SocketAsyncEventArgs e)
         {
-            if (_connectionState == ConnectionState.Connected)
+            try
             {
-                e.SetBuffer(null, 0, 0);
-                e.BufferList = null;
-                _sendSaeaPool.Return(e);
+                if (_connectionState == ConnectionState.Connected)
+                {
+                    e.SetBuffer(null, 0, 0);
+                    e.BufferList = null;
+                    _sendSaeaPool.Return(e);
+                }
+                else
+                {
+                    e.Dispose();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                e.Dispose();
+                RaiseException(ex);
             }
         }
         #endregion
