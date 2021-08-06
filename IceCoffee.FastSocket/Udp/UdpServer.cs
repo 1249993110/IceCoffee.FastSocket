@@ -428,8 +428,12 @@ namespace IceCoffee.FastSocket.Udp
                 _isStarted = true;
                 OnStarted();
 
-                // 开始接受数据
-                StartReceive();
+                if(_multicastEndpoint != null)
+                {
+                    // 开始接受数据
+                    StartReceive();
+                }
+
                 return true;
             }
         }

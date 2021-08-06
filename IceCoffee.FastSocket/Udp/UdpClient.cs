@@ -428,8 +428,6 @@ namespace IceCoffee.FastSocket.Udp
                 }
 
                 _socket = CreateSocket();
-                _recvSaeaPool = new SaeaPool(CreateRecvSaea);
-                _sendSaeaPool = new SaeaPool(CreateSendSaea);
 
                 _receiveEndpoint = new IPEndPoint((_remoteEndpoint.AddressFamily == AddressFamily.InterNetworkV6) ? IPAddress.IPv6Any : IPAddress.Any, 0);
 
@@ -442,8 +440,13 @@ namespace IceCoffee.FastSocket.Udp
                     _socket.Bind(_receiveEndpoint);
                 }
 
+                _recvSaeaPool = new SaeaPool(CreateRecvSaea);
+                _sendSaeaPool = new SaeaPool(CreateSendSaea);
+
                 _isOpened = true;
                 OnOpened();
+
+                StartReceive();
             }
         }
 

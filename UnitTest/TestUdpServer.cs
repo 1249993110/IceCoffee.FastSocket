@@ -9,6 +9,11 @@ namespace UnitTest
 {
     class TestUdpServer : UdpServer
     {
+        public TestUdpServer(IPAddress address, int port, UdpServerOptions options = null) :base(address, port)
+        {
+
+        }
+
         public TestUdpServer(string address, int port, UdpServerOptions options = null) : base(address, port, options)
         {
         }
