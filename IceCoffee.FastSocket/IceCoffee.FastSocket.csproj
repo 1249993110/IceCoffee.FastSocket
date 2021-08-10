@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net46;netstandard2.0;netcoreapp3.1</TargetFrameworks>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <Description>Fast and lightweight asynchronous socket server/client .NET library with support TCP</Description>
+    <Description>Fast and lightweight asynchronous socket server/client .NET library with support TCP and UDP</Description>
     <Authors>IceCoffee</Authors>
     <Product>IceCoffee</Product>
     <Copyright>Copyright (c) 2021 IceCoffee</Copyright>
