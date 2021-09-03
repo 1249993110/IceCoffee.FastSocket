@@ -53,10 +53,17 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public TcpServerOptions Options => _options;
 
+#if NET45
+        /// <summary>
+        /// 会话
+        /// </summary>
+        public ConcurrentDictionary<int, TcpSession> Sessions => _sessions;
+#else
         /// <summary>
         /// 会话
         /// </summary>
         public IReadOnlyDictionary<int, TcpSession> Sessions => _sessions;
+#endif
 
         /// <summary>
         /// 连接到服务器的会话数

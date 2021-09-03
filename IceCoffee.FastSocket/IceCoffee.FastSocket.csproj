@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net46;netstandard2.0;netcoreapp3.1</TargetFrameworks>
+    <TargetFrameworks>net45;net46;netstandard2.0;netcoreapp3.1</TargetFrameworks>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <Description>Fast and lightweight asynchronous socket server/client .NET library with support TCP and UDP</Description>
     <Authors>IceCoffee</Authors>
