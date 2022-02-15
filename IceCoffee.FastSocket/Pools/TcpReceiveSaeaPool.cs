@@ -10,16 +10,8 @@ namespace IceCoffee.FastSocket.Pools
     /// </summary>
     internal class TcpReceiveSaeaPool : ConcurrentBagPool<SocketAsyncEventArgs>
     {
-        private readonly Func<SocketAsyncEventArgs> _createCallback;
-
-        public TcpReceiveSaeaPool(Func<SocketAsyncEventArgs> createCallback)
+        public TcpReceiveSaeaPool(Func<SocketAsyncEventArgs> objectGenerator) : base(objectGenerator)
         {
-            _createCallback = createCallback;
-        }
-
-        protected override SocketAsyncEventArgs Create()
-        {
-            return _createCallback.Invoke();
         }
     }
 }

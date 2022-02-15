@@ -53,17 +53,10 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public TcpServerOptions Options => _options;
 
-#if NET45
-        /// <summary>
-        /// 会话
-        /// </summary>
-        public ConcurrentDictionary<int, TcpSession> Sessions => _sessions;
-#else
         /// <summary>
         /// 会话
         /// </summary>
         public IReadOnlyDictionary<int, TcpSession> Sessions => _sessions;
-#endif
 
         /// <summary>
         /// 连接到服务器的会话数
@@ -89,15 +82,17 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         /// <param name="address">IP address</param>
         /// <param name="port">Port number</param>
+        /// <param name="options"></param>
         public TcpServer(string address, int port, TcpServerOptions options = null)
             : this(new IPEndPoint(IPAddress.Parse(address), port), options)
         {
         }
-        
+
         /// <summary>
         /// 使用给定的 IP 端点初始化 TCP 服务器
         /// </summary>
         /// <param name="endPoint">IP end point</param>
+        /// <param name="options"></param>
         public TcpServer(IPEndPoint endPoint, TcpServerOptions options = null)
         {
             _id = Guid.NewGuid();

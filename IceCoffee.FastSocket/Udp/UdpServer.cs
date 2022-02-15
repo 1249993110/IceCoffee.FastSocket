@@ -75,15 +75,17 @@ namespace IceCoffee.FastSocket.Udp
         /// </summary>
         /// <param name="address">IP address</param>
         /// <param name="port">Port number</param>
+        /// <param name="options"></param>
         public UdpServer(string address, int port, UdpServerOptions options = null)
             : this(new IPEndPoint(IPAddress.Parse(address), port), options)
         {
         }
-        
+
         /// <summary>
         /// 使用给定的 IP 端点初始化 UDP 服务器
         /// </summary>
         /// <param name="endPoint">IP end point</param>
+        /// <param name="options"></param>
         public UdpServer(IPEndPoint endPoint, UdpServerOptions options = null)
         {
             _id = Guid.NewGuid();
@@ -267,7 +269,7 @@ namespace IceCoffee.FastSocket.Udp
         /// <summary>
         /// 多播数据报到准备好的多播端点的（异步） 
         /// </summary>
-        /// <param name="buffer">Datagram buffer to multicast</param>
+        /// <param name="bufferList"></param>
         /// <returns>'true' if the datagram was successfully multicasted, 'false' if the datagram was not multicasted</returns>
         public virtual void MulticastAsync(IList<ArraySegment<byte>> bufferList)
         {

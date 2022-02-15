@@ -1,5 +1,6 @@
 ﻿using IceCoffee.Common.Pools;
 using IceCoffee.FastSocket.Tcp;
+using Microsoft.Extensions.ObjectPool;
 using System;
 using System.Net.Sockets;
 
@@ -10,16 +11,8 @@ namespace IceCoffee.FastSocket.Pools
     /// </summary>
     internal class SaeaPool : LocklessPool<SocketAsyncEventArgs>
     {
-        private readonly Func<SocketAsyncEventArgs> _createCallback;
-
-        public SaeaPool(Func<SocketAsyncEventArgs> createCallback)
+        public SaeaPool(Func<SocketAsyncEventArgs> objectGenerator) : base(objectGenerator)
         {
-            _createCallback = createCallback;
-        }        
-
-        protected override SocketAsyncEventArgs Create()
-        {
-            return _createCallback.Invoke();
         }
     }
 }

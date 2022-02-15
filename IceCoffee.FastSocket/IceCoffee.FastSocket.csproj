@@ -1,31 +1,33 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFrameworks>net45;net46;netstandard2.0;netcoreapp3.1</TargetFrameworks>
-    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <Description>Fast and lightweight asynchronous socket server/client .NET library with support TCP and UDP</Description>
-    <Authors>IceCoffee</Authors>
-    <Product>IceCoffee</Product>
-    <Copyright>Copyright (c) 2021 IceCoffee</Copyright>
-    <PackageLicenseFile>LICENSE</PackageLicenseFile>
-    <PackageProjectUrl>https://github.com/1249993110/IceCoffee.FastSocket</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/1249993110/IceCoffee.FastSocket</RepositoryUrl>
-    <Version>1.0.0.9</Version>
-  </PropertyGroup>
+	<PropertyGroup>
+		<Authors>IceCoffee</Authors>
+		<Copyright>Copyright (c) 2021 IceCoffee</Copyright>
+		<Description>Fast and lightweight asynchronous socket server/client .NET library with support TCP and UDP</Description>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+		<PackageProjectUrl>https://github.com/1249993110/IceCoffee.FastSocket</PackageProjectUrl>
+		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+		<Product>IceCoffee</Product>
+		<RepositoryUrl>https://github.com/1249993110/IceCoffee.FastSocket</RepositoryUrl>
+		<TargetFrameworks>net6.0;netcoreapp3.1;net461</TargetFrameworks>
+		<Version>1.0.1.0</Version>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Include="..\LICENSE">
-      <Pack>True</Pack>
-      <PackagePath></PackagePath>
-    </None>
-  </ItemGroup>
-  
-  <PropertyGroup Condition="'$(Configuration)'=='Release'">
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
-  </PropertyGroup>
+	<ItemGroup>
+		<None Include="..\LICENSE">
+			<Pack>True</Pack>
+			<PackagePath></PackagePath>
+		</None>
+		<None Include="..\README.md" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="IceCoffee.Common" Version="1.0.0.33" />
-  </ItemGroup>
+	<PropertyGroup Condition="'$(Configuration)'=='Release'">
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="IceCoffee.Common" Version="1.0.2.1" />
+	</ItemGroup>
 
 </Project>
