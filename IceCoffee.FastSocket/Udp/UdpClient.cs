@@ -14,7 +14,7 @@ namespace IceCoffee.FastSocket.Udp
     {
         #region 字段
         private readonly Guid _id;
-        private bool _isOpened;
+        private volatile bool _isOpened;
         private EndPoint _remoteEndpoint;
         private EndPoint _receiveEndpoint;
         private readonly UdpClientOptions _options;
@@ -49,6 +49,14 @@ namespace IceCoffee.FastSocket.Udp
         /// Udp 客户端选项
         /// </summary>
         public UdpClientOptions Options => _options;
+        #endregion
+
+        #region 事件
+        public event Action Opened;
+        public event Action Closed;
+        public event Action<IPAddress> JoinedMulticastGroup;
+        public event Action<IPAddress> LeftMulticastGroup;
+        public event Action<Exception> ExceptionCaught;
         #endregion
 
         #region 方法
@@ -220,7 +228,7 @@ namespace IceCoffee.FastSocket.Udp
                 }
             }
 
-            OnException(exception);
+            OnExceptionCaught(exception);
         }
 
         #region Send data to server
@@ -235,9 +243,19 @@ namespace IceCoffee.FastSocket.Udp
         {
             try
             {
-                if (_isOpened == false || count <= 0)
+                if (endPoint == null)
                 {
-                    return;
+                    throw new ArgumentNullException(nameof(endPoint));
+                }
+
+                if (buffer == null)
+                {
+                    throw new ArgumentNullException(nameof(buffer));
+                }
+
+                if (_isOpened == false)
+                {
+                    throw new Exception("套接字尚未打开，无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -273,9 +291,14 @@ namespace IceCoffee.FastSocket.Udp
         {
             try
             {
-                if (_isOpened == false || bufferList.Count <= 0)
+                if (bufferList == null || bufferList.Count <= 0)
                 {
-                    return;
+                    throw new ArgumentNullException(nameof(bufferList));
+                }
+
+                if (_isOpened == false)
+                {
+                    throw new Exception("套接字尚未打开，无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -354,7 +377,10 @@ namespace IceCoffee.FastSocket.Udp
         /// 当发生非检查异常时调用
         /// </summary>
         /// <param name="exception"></param>
-        protected virtual void OnException(Exception exception) { }
+        protected virtual void OnExceptionCaught(Exception exception) 
+        {
+            ExceptionCaught?.Invoke(exception);
+        }
 
         /// <summary>
         /// 创建一个新的套接字对象
@@ -384,12 +410,18 @@ namespace IceCoffee.FastSocket.Udp
         /// <summary>
         /// 客户端打开后调用
         /// </summary>
-        protected virtual void OnOpened() { }
+        protected virtual void OnOpened() 
+        {
+            Opened?.Invoke();
+        }
 
         /// <summary>
         /// 客户端关闭后调用
         /// </summary>
-        protected virtual void OnClosed() { }
+        protected virtual void OnClosed() 
+        {
+            Closed?.Invoke();
+        }
 
         /// <summary>
         /// 当收到数据报后调用
@@ -406,13 +438,19 @@ namespace IceCoffee.FastSocket.Udp
         /// 加入具有给定 IP 地址的多播组后调用
         /// </summary>
         /// <param name="ipAddress"></param>
-        protected virtual void OnJoinedMulticastGroup(IPAddress ipAddress) { }
+        protected virtual void OnJoinedMulticastGroup(IPAddress ipAddress) 
+        {
+            JoinedMulticastGroup?.Invoke(ipAddress);
+        }
 
         /// <summary>
         /// 离开具有给定 IP 地址的多播组后调用
         /// </summary>
         /// <param name="ipAddress"></param>
-        protected virtual void OnLeftMulticastGroup(IPAddress ipAddress) { }
+        protected virtual void OnLeftMulticastGroup(IPAddress ipAddress) 
+        {
+            LeftMulticastGroup?.Invoke(ipAddress);
+        }
         #endregion
 
         #region 公开方法
@@ -421,7 +459,7 @@ namespace IceCoffee.FastSocket.Udp
         /// </summary>
         public void Open()
         {
-            lock (this)
+            try
             {
                 if (_isOpened)
                 {
@@ -449,6 +487,10 @@ namespace IceCoffee.FastSocket.Udp
 
                 StartReceive();
             }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in UpdClient.Open", ex);
+            }
         }
 
         /// <summary>
@@ -456,7 +498,7 @@ namespace IceCoffee.FastSocket.Udp
         /// </summary>
         public void Close()
         {
-            lock (this)
+            try
             {
                 if (_isOpened == false)
                 {
@@ -474,6 +516,10 @@ namespace IceCoffee.FastSocket.Udp
                 _isOpened = false;
                 OnClosed();
             }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in UpdClient.Close", ex);
+            }
         }
 
         #region Multicast group
@@ -483,16 +529,23 @@ namespace IceCoffee.FastSocket.Udp
         /// <param name="address">IP address</param>
         public virtual void JoinMulticastGroup(IPAddress address)
         {
-            if (_remoteEndpoint.AddressFamily == AddressFamily.InterNetworkV6)
+            try
             {
-                _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.AddMembership, new IPv6MulticastOption(address));
-            }
-            else
-            {
-                _socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(address));
-            }
+                if (_remoteEndpoint.AddressFamily == AddressFamily.InterNetworkV6)
+                {
+                    _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.AddMembership, new IPv6MulticastOption(address));
+                }
+                else
+                {
+                    _socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(address));
+                }
 
-            OnJoinedMulticastGroup(address);
+                OnJoinedMulticastGroup(address);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in UpdClient.JoinMulticastGroup", ex);
+            }
         }
         /// <summary>
         /// 加入具有给定 IP 地址的多播组（同步） 
@@ -509,16 +562,23 @@ namespace IceCoffee.FastSocket.Udp
         /// <param name="address">IP address</param>
         public virtual void LeaveMulticastGroup(IPAddress address)
         {
-            if (_remoteEndpoint.AddressFamily == AddressFamily.InterNetworkV6)
+            try
             {
-                _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.DropMembership, new IPv6MulticastOption(address));
-            }
-            else
-            {
-                _socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.DropMembership, new MulticastOption(address));
-            }
+                if (_remoteEndpoint.AddressFamily == AddressFamily.InterNetworkV6)
+                {
+                    _socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.DropMembership, new IPv6MulticastOption(address));
+                }
+                else
+                {
+                    _socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.DropMembership, new MulticastOption(address));
+                }
 
-            OnLeftMulticastGroup(address);
+                OnLeftMulticastGroup(address);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in UpdClient.LeaveMulticastGroup", ex);
+            }
         }
         /// <summary>
         /// 使用给定的 IP 地址离开多播组（同步） 
@@ -574,40 +634,19 @@ namespace IceCoffee.FastSocket.Udp
         #endregion
 
         #region IDisposable implementation
-        private bool _isDisposed;
-
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposingManagedResources)
+        protected virtual void Dispose(bool disposing)
         {
-            if (_isDisposed == false)
+            if (disposing)
             {
-                if (disposingManagedResources)
-                {
-                    // Dispose managed resources here...
-                    Close();
-                }
-
-                // Dispose unmanaged resources here...
-
-                // Set large fields to null here...
-
-                // Mark as disposed.
-                _isDisposed = true;
+                Close();
             }
         }
-
-        // Use C# destructor syntax for finalization code.
-        ~UdpClient()
-        {
-            // Simply call Dispose(false).
-            Dispose(false);
-        }
-
         #endregion
         #endregion
     }

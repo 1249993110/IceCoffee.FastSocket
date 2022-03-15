@@ -10,8 +10,11 @@
 		<Product>IceCoffee</Product>
 		<RepositoryUrl>https://github.com/1249993110/IceCoffee.FastSocket</RepositoryUrl>
 		<TargetFrameworks>net6.0;netcoreapp3.1;net461</TargetFrameworks>
-		<Version>1.0.1.0</Version>
+		<Version>1.0.1.5</Version>
+		<LangVersion>10.0</LangVersion>
 		<NoWarn>$(NoWarn);1591</NoWarn>
+		<Nullable>disable</Nullable>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -22,12 +25,8 @@
 		<None Include="..\README.md" />
 	</ItemGroup>
 
-	<PropertyGroup Condition="'$(Configuration)'=='Release'">
-		<GenerateDocumentationFile>True</GenerateDocumentationFile>
-	</PropertyGroup>
-
 	<ItemGroup>
-		<PackageReference Include="IceCoffee.Common" Version="1.0.2.1" />
+		<PackageReference Include="IceCoffee.Common" Version="1.0.2.2" />
 	</ItemGroup>
 
 </Project>

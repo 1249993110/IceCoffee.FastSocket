@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,6 +16,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// 选项：接收缓冲区大小
         /// <remarks>默认值是 8192</remarks>
         /// </summary>
+        [DefaultValue(8192)]
         public int ReceiveBufferSize { get; set; } = 8192;
 
         /// <summary>
@@ -32,6 +34,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// <remarks>
         /// 不延迟直接发送。Tcp为了合并小包而设计，客户端默认 false，服务端默认 true
         /// </remarks>
+        [DefaultValue(true)]
         public bool NoDelay { get; set; } = true;
 
         /// <summary>
@@ -65,6 +68,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// 此选项将设置侦听套接字的操作系统使用 TCP 缓存 SO_Backlog
         /// <para>实际上是用于处理进站 (inbound)</para>
         /// </remarks>
-        public int AcceptorBacklog { get; set; } = 1024;
+        [DefaultValue(int.MaxValue)]
+        public int AcceptorBacklog { get; set; } = int.MaxValue;
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,6 +16,7 @@ namespace IceCoffee.FastSocket.Udp
         /// 选项：接收缓冲区大小
         /// <remarks>默认值是 1024</remarks>
         /// </summary>
+        [DefaultValue(1024)]
         public int ReceiveBufferSize { get; set; } = 1024;
 
         /// <summary>

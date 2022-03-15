@@ -18,7 +18,7 @@ namespace UnitTest
         {
         }
 
-        protected override void OnException(Exception exception)
+        protected override void OnExceptionCaught(Exception exception)
         {
             Console.WriteLine(exception);
         }

@@ -19,7 +19,7 @@ namespace IceCoffee.FastSocket.Udp
     {
         #region 字段
         private readonly Guid _id;
-        private bool _isStarted;
+        private volatile bool _isStarted;
         private IPEndPoint _endPoint;
         private IPEndPoint _multicastEndpoint;
         private readonly UdpServerOptions _options;
@@ -55,6 +55,12 @@ namespace IceCoffee.FastSocket.Udp
         /// Udp 服务端选项
         /// </summary>
         public UdpServerOptions Options => _options;
+        #endregion
+
+        #region 事件
+        public event Action Started;
+        public event Action Stopped;
+        public event Action<Exception> ExceptionCaught;
         #endregion
 
         #region 方法
@@ -186,9 +192,19 @@ namespace IceCoffee.FastSocket.Udp
         {
             try
             {
-                if (_isStarted == false || count <= 0)
+                if (endPoint == null)
                 {
-                    return;
+                    throw new ArgumentNullException(nameof(endPoint));
+                }
+
+                if (buffer == null)
+                {
+                    throw new ArgumentNullException(nameof(buffer));
+                }
+
+                if (_isStarted == false)
+                {
+                    throw new Exception("服务端尚未启动，无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -224,9 +240,19 @@ namespace IceCoffee.FastSocket.Udp
         {
             try
             {
-                if (_isStarted == false || bufferList.Count <= 0)
+                if (endPoint == null)
                 {
-                    return;
+                    throw new ArgumentNullException(nameof(endPoint));
+                }
+
+                if (bufferList == null || bufferList.Count <= 0)
+                {
+                    throw new ArgumentNullException(nameof(bufferList));
+                }
+
+                if (_isStarted == false)
+                {
+                    throw new Exception("服务端尚未启动，无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -328,7 +354,7 @@ namespace IceCoffee.FastSocket.Udp
                 }
             }
 
-            OnException(exception);
+            OnExceptionCaught(exception);
         }
 
         private SocketAsyncEventArgs CreateRecvSaea()
@@ -352,7 +378,10 @@ namespace IceCoffee.FastSocket.Udp
         /// 当发生非检查异常时调用
         /// </summary>
         /// <param name="exception"></param>
-        protected virtual void OnException(Exception exception) {  }
+        protected virtual void OnExceptionCaught(Exception exception) 
+        {
+            ExceptionCaught?.Invoke(exception);
+        }
         
         /// <summary>
         /// 创建一个新的套接字对象
@@ -382,12 +411,18 @@ namespace IceCoffee.FastSocket.Udp
         /// <summary>
         /// 当服务端开始后调用
         /// </summary>
-        protected virtual void OnStarted() { }
+        protected virtual void OnStarted() 
+        {
+            Started?.Invoke();
+        }
 
         /// <summary>
         /// 当服务端停止后调用
         /// </summary>
-        protected virtual void OnStopped() { }
+        protected virtual void OnStopped() 
+        {
+            Stopped?.Invoke();
+        }
 
         /// <summary>
         /// 当收到数据报后调用
@@ -405,14 +440,13 @@ namespace IceCoffee.FastSocket.Udp
         /// <summary>
         /// 启动服务器
         /// </summary>
-        /// <returns>'true' 如果服务器启动成功, 'false' 如果服务器启动失败</returns>
-        public virtual bool Start()
+        public virtual void Start()
         {
-            lock (this)
+            try
             {
                 if (_isStarted)
                 {
-                    return false;
+                    throw new Exception("服务端已经开始监听");
                 }
 
                 // 创建一个新的套接字接受器
@@ -430,13 +464,15 @@ namespace IceCoffee.FastSocket.Udp
                 _isStarted = true;
                 OnStarted();
 
-                if(_multicastEndpoint != null)
+                if (_multicastEndpoint != null)
                 {
                     // 开始接受数据
                     StartReceive();
                 }
-
-                return true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in UdpServer.Start", ex);
             }
         }
 
@@ -446,9 +482,9 @@ namespace IceCoffee.FastSocket.Udp
         /// <param name="multicastAddress">Multicast IP address</param>
         /// <param name="multicastPort">Multicast port number</param>
         /// <returns>'true' if the server was successfully started, 'false' if the server failed to start</returns>
-        public virtual bool Start(IPAddress multicastAddress, int multicastPort) 
+        public virtual void Start(IPAddress multicastAddress, int multicastPort) 
         { 
-            return Start(new IPEndPoint(multicastAddress, multicastPort)); 
+            Start(new IPEndPoint(multicastAddress, multicastPort)); 
         }
 
         /// <summary>
@@ -457,9 +493,9 @@ namespace IceCoffee.FastSocket.Udp
         /// <param name="multicastAddress">Multicast IP address</param>
         /// <param name="multicastPort">Multicast port number</param>
         /// <returns>'true' if the server was successfully started, 'false' if the server failed to start</returns>
-        public virtual bool Start(string multicastAddress, int multicastPort) 
+        public virtual void Start(string multicastAddress, int multicastPort) 
         { 
-            return Start(new IPEndPoint(IPAddress.Parse(multicastAddress), multicastPort)); 
+            Start(new IPEndPoint(IPAddress.Parse(multicastAddress), multicastPort)); 
         }
 
         /// <summary>
@@ -467,32 +503,36 @@ namespace IceCoffee.FastSocket.Udp
         /// </summary>
         /// <param name="multicastEndpoint">Multicast IP endpoint</param>
         /// <returns>'true' if the server was successfully started, 'false' if the server failed to start</returns>
-        public virtual bool Start(IPEndPoint multicastEndpoint)
+        public virtual void Start(IPEndPoint multicastEndpoint)
         {
             _multicastEndpoint = multicastEndpoint;
-            return Start();
+            Start();
         }
 
         /// <summary>
         /// 重新启动服务器
         /// </summary>
         /// <returns></returns>
-        public virtual bool Restart()
+        public virtual void Restart()
         {
-            Stop();
-            return Start();
+            if (_isStarted)
+            {
+                Stop();
+            }
+            
+            Start();
         }
 
         /// <summary>
         /// 停止服务器
         /// </summary>
-        public virtual bool Stop()
+        public virtual void Stop()
         {
-            lock (this)
+            try
             {
                 if (_isStarted == false)
                 {
-                    return false;
+                    throw new Exception("服务端已经停止监听");
                 }
 
                 _isStarted = false;
@@ -505,8 +545,10 @@ namespace IceCoffee.FastSocket.Udp
                 _socket = null;
 
                 OnStopped();
-
-                return true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in UdpServer.Stop", ex);
             }
         }
         #endregion
@@ -518,6 +560,7 @@ namespace IceCoffee.FastSocket.Udp
             {
                 if (_isStarted)
                 {
+                    e.UserToken = null;
                     _recvSaeaPool.Return(e);
                 }
                 else
@@ -538,6 +581,7 @@ namespace IceCoffee.FastSocket.Udp
                 {
                     e.SetBuffer(null, 0, 0);
                     e.BufferList = null;
+                    e.UserToken = null;
                     _sendSaeaPool.Return(e);
                 }
                 else
@@ -553,7 +597,6 @@ namespace IceCoffee.FastSocket.Udp
         #endregion
 
         #region IDisposable implementation
-        private bool _isDisposed;
 
         public void Dispose()
         {
@@ -561,32 +604,13 @@ namespace IceCoffee.FastSocket.Udp
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposingManagedResources)
+        protected virtual void Dispose(bool disposing)
         {
-            if (_isDisposed == false)
+            if (disposing)
             {
-                if (disposingManagedResources)
-                {
-                    // Dispose managed resources here...
-                    Stop();
-                }
-
-                // Dispose unmanaged resources here...
-
-                // Set large fields to null here...
-
-                // Mark as disposed.
-                _isDisposed = true;
+                Stop();
             }
         }
-
-        // Use C# destructor syntax for finalization code.
-        ~UdpServer()
-        {
-            // Simply call Dispose(false).
-            Dispose(false);
-        }
-
         #endregion
         #endregion
 

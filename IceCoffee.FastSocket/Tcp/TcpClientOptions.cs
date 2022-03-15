@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,6 +16,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// 选项：接收缓冲区大小
         /// <remarks>默认值是 8192</remarks>
         /// </summary>
+        [DefaultValue(8192)]
         public int ReceiveBufferSize { get; set; } = 8192;
 
         /// <summary>
@@ -40,6 +42,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// <remarks>
         /// 默认值：5000 毫秒
         /// </remarks>
+        [DefaultValue(5000D)]
         public double ConnectionTimeout { get; set; } = 5000D;
     }
 }

@@ -53,6 +53,13 @@ namespace IceCoffee.FastSocket.Tcp
         public TcpClientOptions Options => _options;
         #endregion
 
+        #region 事件
+        public event Action Connected;
+        public event Action Disconnected;
+        public event Action<ConnectionState> ConnectionStateChanged;
+        public event Action<Exception> ExceptionCaught;
+        #endregion
+
         #region 方法
         #region 构造方法
         /// <summary>
@@ -167,6 +174,7 @@ namespace IceCoffee.FastSocket.Tcp
                     else
                     {
                         ReadBuffer.CacheSaea(e);
+
                         OnReceived();
 
                         // 如果在接收数据中断开，直接关闭当前连接
@@ -257,7 +265,7 @@ namespace IceCoffee.FastSocket.Tcp
                 }
             }
 
-            OnException(exception);
+            OnExceptionCaught(exception);
         }
 
         /// <summary>
@@ -281,9 +289,14 @@ namespace IceCoffee.FastSocket.Tcp
         {
             try
             {
-                if (_connectionState != ConnectionState.Connected || count <= 0)
+                if (buffer == null)
                 {
-                    return;
+                    throw new ArgumentNullException(nameof(buffer));
+                }
+
+                if (_connectionState != ConnectionState.Connected)
+                {
+                    throw new Exception("未成功连接服务端，无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -315,9 +328,14 @@ namespace IceCoffee.FastSocket.Tcp
         {
             try
             {
-                if (_connectionState != ConnectionState.Connected || bufferList.Count <= 0)
+                if (bufferList == null || bufferList.Count <= 0)
                 {
-                    return;
+                    throw new ArgumentNullException(nameof(bufferList));
+                }
+
+                if (_connectionState != ConnectionState.Connected)
+                {
+                    throw new Exception("未成功连接服务端，无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -355,14 +373,14 @@ namespace IceCoffee.FastSocket.Tcp
 
         private SocketAsyncEventArgs CreateRecvSaea()
         {
-            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+            var saea = new SocketAsyncEventArgs();
             saea.Completed += OnAsyncCompleted;
             saea.SetBuffer(new byte[_options.ReceiveBufferSize], 0, _options.ReceiveBufferSize);
             return saea;
         }
         private SocketAsyncEventArgs CreateSendSaea()
         {
-            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+            var saea = new SocketAsyncEventArgs();
             saea.Completed += OnAsyncCompleted;
             return saea;
         }
@@ -373,7 +391,10 @@ namespace IceCoffee.FastSocket.Tcp
         /// 当发生非检查异常时调用
         /// </summary>
         /// <param name="exception"></param>
-        protected virtual void OnException(Exception exception) { }
+        protected virtual void OnExceptionCaught(Exception exception) 
+        {
+            ExceptionCaught.Invoke(exception);
+        }
 
         /// <summary>
         /// 创建一个新的套接字对象
@@ -397,12 +418,18 @@ namespace IceCoffee.FastSocket.Tcp
         /// <summary>
         /// 连接成功后调用
         /// </summary>
-        protected virtual void OnConnected() {  }
+        protected virtual void OnConnected() 
+        {
+            Connected?.Invoke();
+        }
 
         /// <summary>
         /// 断开连接后调用
         /// </summary>
-        protected virtual void OnDisconnected() { }
+        protected virtual void OnDisconnected() 
+        {
+            Disconnected?.Invoke();
+        }
 
         /// <summary>
         /// 收到数据后调用
@@ -413,7 +440,10 @@ namespace IceCoffee.FastSocket.Tcp
         /// 连接状态改变后调用
         /// </summary>
         /// <param name="connectionState"></param>
-        protected virtual void OnConnectionStateChanged(ConnectionState connectionState) { }
+        protected virtual void OnConnectionStateChanged(ConnectionState connectionState) 
+        {
+            ConnectionStateChanged?.Invoke(connectionState);
+        }
         #endregion
 
         #region 公开方法
@@ -422,7 +452,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public void ConnectAsync()
         {
-            lock (this)
+            try
             {
                 if (_connectionState != ConnectionState.Disconnected)
                 {
@@ -450,6 +480,10 @@ namespace IceCoffee.FastSocket.Tcp
                     ProcessConnect();
                 }
             }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in TcpClient.ConnectAsync", ex);
+            }
         }
 
         /// <summary>
@@ -457,7 +491,11 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public void ReconnectAsync()
         {
-            DisconnectAsync();
+            if( _connectionState == ConnectionState.Connected)
+            {
+                DisconnectAsync();
+            }
+
             ConnectAsync();
         }
 
@@ -466,7 +504,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         public void DisconnectAsync()
         {
-            lock (this)
+            try
             {
                 // Cancel connecting operation
                 if (_connectionState == ConnectionState.Connecting)
@@ -479,7 +517,7 @@ namespace IceCoffee.FastSocket.Tcp
                 }
                 else
                 {
-                    throw new Exception("尝试断开失败，未连接成功且未正在连接");
+                    throw new Exception("尝试断开失败，未连接成功或未正在连接");
                 }
 
                 _connectionTimeoutChecker.Stop();
@@ -508,11 +546,15 @@ namespace IceCoffee.FastSocket.Tcp
                     _socketConnecter = null;
                 }
                 catch (ObjectDisposedException) // 如果在尝试连接中断开，即执行了 Socket.CancelConnectAsync
-                { 
+                {
                 }
 
                 ChangeConnectionState(ConnectionState.Disconnected);
                 OnDisconnected();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in TcpClient.DisconnectAsync", ex);
             }
         }
 
@@ -560,40 +602,19 @@ namespace IceCoffee.FastSocket.Tcp
         #endregion
 
         #region IDisposable implementation
-        private bool _isDisposed;
-
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposingManagedResources)
+        protected virtual void Dispose(bool disposing)
         {
-            if (_isDisposed == false)
+            if (disposing)
             {
-                if (disposingManagedResources)
-                {
-                    // Dispose managed resources here...
-                    DisconnectAsync();
-                }
-
-                // Dispose unmanaged resources here...
-
-                // Set large fields to null here...
-
-                // Mark as disposed.
-                _isDisposed = true;
+                DisconnectAsync();
             }
         }
-
-        // Use C# destructor syntax for finalization code.
-        ~TcpClient()
-        {
-            // Simply call Dispose(false).
-            Dispose(false);
-        }
-
         #endregion
         #endregion
     }

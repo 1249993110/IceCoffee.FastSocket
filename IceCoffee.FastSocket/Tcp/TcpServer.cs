@@ -19,7 +19,7 @@ namespace IceCoffee.FastSocket.Tcp
     {
         #region 字段
         private readonly Guid _id;
-        private bool _isListening;
+        private volatile bool _isListening;
         private IPEndPoint _endPoint;
         private readonly TcpServerOptions _options;
 
@@ -54,14 +54,22 @@ namespace IceCoffee.FastSocket.Tcp
         public TcpServerOptions Options => _options;
 
         /// <summary>
-        /// 会话
+        /// 已打开的会话
         /// </summary>
         public IReadOnlyDictionary<int, TcpSession> Sessions => _sessions;
 
         /// <summary>
         /// 连接到服务器的会话数
         /// </summary>
-        public int SessionCount { get { return _sessions.Count; } }
+        public int SessionCount => _sessions.Count;
+        #endregion
+
+        #region 事件
+        public event Action Started;
+        public event Action Stopped;
+        public event Action<TcpSession> SessionStarted;
+        public event Action<TcpSession> SessionClosed;
+        public event Action<Exception> ExceptionCaught;
         #endregion
 
         #region 方法
@@ -178,6 +186,7 @@ namespace IceCoffee.FastSocket.Tcp
                 {
                     RaiseException(ex);
                     ProcessClose(receiveSaea);
+                    CollectSession(session);
                 }
             }
             catch (Exception ex)
@@ -202,7 +211,7 @@ namespace IceCoffee.FastSocket.Tcp
         {
             try
             {
-                TcpSession session = e.UserToken as TcpSession;
+                TcpSession session = (TcpSession)e.UserToken;
                 SocketError socketError = e.SocketError;
 
                 if (socketError != SocketError.Success)
@@ -215,37 +224,35 @@ namespace IceCoffee.FastSocket.Tcp
                     if (e.BytesTransferred == 0)
                     {
                         ProcessClose(e);
+                        return;
                     }
-                    else
+                    
+                    session.ReadBuffer.CacheSaea(e);
+
+                    // 如果在接收数据中出现异常，则不需要回收saea 只需回收会话，因为在 ReadBuffer.Clear 中已经回收过 saea
+                    try
                     {
-                        session.ReadBuffer.CacheSaea(e);
+                        session.OnReceived();
+                    }
+                    catch (Exception ex)
+                    {
+                        RaiseException(ex);
+                        CollectSession(session);
+                        return;
+                    }
 
-                        // 如果在接收数据中出现异常，则不需要回收saea 只需回收会话，因为在 ReadBuffer.CacheSaea 中已经回收过 saea
-                        try
-                        {
-                            session.OnReceived();
-                        }
-                        catch (Exception ex)
-                        {
-                            RaiseException(ex);
-                            CollectSession(session);
-                        }
+                    // 如果在接收数据中关闭会话，则不需要回收saea 只需回收会话，因为在 ReadBuffer.Clear 中已经回收过 saea
+                    if (session.socket == null)
+                    {
+                        CollectSession(session);
+                        return;
+                    }
 
-                        // 如果在接收数据中关闭会话，则不需要回收saea 只需回收会话，因为在 ReadBuffer.CacheSaea 中已经回收过 saea
-                        if (session._socket == null)
-                        {
-                            CollectSession(session);
-                            return;
-                        }
-                        else
-                        {
-                            SocketAsyncEventArgs receiveSaea = _recvSaeaPool.Get();
-                            receiveSaea.UserToken = session;
-                            if (session._socket.ReceiveAsync(receiveSaea) == false)
-                            {
-                                ProcessReceive(receiveSaea);
-                            }
-                        }
+                    e = _recvSaeaPool.Get();
+                    e.UserToken = session;
+                    if (session.socket.ReceiveAsync(e) == false)
+                    {
+                        ProcessReceive(e);
                     }
                 }
             }
@@ -296,24 +303,33 @@ namespace IceCoffee.FastSocket.Tcp
         {
             try
             {
-                if (_isListening == false || count <= 0)
+                if (session == null)
                 {
-                    return;
+                    throw new ArgumentNullException(nameof(session));
                 }
 
-                Socket socket = session._socket;
+                if (buffer == null)
+                {
+                    throw new ArgumentNullException(nameof(buffer));
+                }
+
+                if (_isListening == false)
+                {
+                    throw new Exception("服务端已经停止监听");
+                }
+
                 var e = _sendSaeaPool.Get();
                 e.UserToken = session;
                 e.SetBuffer(buffer, offset, count);
 
-                if (socket.SendAsync(e) == false)
+                if (session.socket.SendAsync(e) == false)
                 {
                     ProcessSend(e);
                 }
             }
             catch (Exception ex)
             {
-                RaiseException(ex);
+                throw new Exception("Error in TcpServer.SendAsync", ex);
             }
         }
         /// <summary>
@@ -335,24 +351,33 @@ namespace IceCoffee.FastSocket.Tcp
         {
             try
             {
-                if (_isListening == false || bufferList.Count <= 0)
+                if (session == null)
                 {
-                    return;
+                    throw new ArgumentNullException(nameof(session));
                 }
 
-                Socket socket = session._socket;
+                if (bufferList == null || bufferList.Count <= 0)
+                {
+                    throw new ArgumentNullException(nameof(bufferList));
+                }
+
+                if (_isListening == false)
+                {
+                    throw new Exception("服务端已经停止监听");
+                }
+
                 var e = _sendSaeaPool.Get();
                 e.UserToken = session;
                 e.BufferList = bufferList;
 
-                if (socket.SendAsync(e) == false)
+                if (session.socket.SendAsync(e) == false)
                 {
                     ProcessSend(e);
                 }
             }
             catch (Exception ex)
             {
-                RaiseException(ex);
+                throw new Exception("Error in TcpServer.SendAsync", ex);
             }
         }
         #endregion
@@ -370,8 +395,7 @@ namespace IceCoffee.FastSocket.Tcp
                     return;
                 }
 
-                TcpSession session = e.UserToken as TcpSession;
-                if (session != null)
+                if (e.UserToken is TcpSession session)
                 {
                     CollectSession(session);
                 }
@@ -414,19 +438,19 @@ namespace IceCoffee.FastSocket.Tcp
                 }
             }
 
-            OnException(exception);
+            OnExceptionCaught(exception);
         }
 
         private SocketAsyncEventArgs CreateRecvSaea()
         {
-            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+            var saea = new SocketAsyncEventArgs();
             saea.Completed += OnRecvAsyncCompleted;
             saea.SetBuffer(new byte[_options.ReceiveBufferSize], 0, _options.ReceiveBufferSize);
             return saea;
         }
         private SocketAsyncEventArgs CreateSendSaea()
         {
-            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+            var saea = new SocketAsyncEventArgs();
             saea.Completed += OnSendAsyncCompleted;
             return saea;
         }
@@ -434,10 +458,13 @@ namespace IceCoffee.FastSocket.Tcp
 
         #region 保护方法
         /// <summary>
-        /// 当发生非检查异常时调用
+        /// 当捕获到非检查异常时调用
         /// </summary>
         /// <param name="exception"></param>
-        protected virtual void OnException(Exception exception) {  }
+        protected virtual void OnExceptionCaught(Exception exception) 
+        {
+            ExceptionCaught?.Invoke(exception);
+        }
         
         /// <summary>
         /// 创建一个新的套接字接受器对象
@@ -480,38 +507,49 @@ namespace IceCoffee.FastSocket.Tcp
         /// <summary>
         /// 当服务端开始侦听后调用
         /// </summary>
-        protected virtual void OnStarted() { }
+        protected virtual void OnStarted() 
+        {
+            Started?.Invoke();
+        }
 
         /// <summary>
         /// 当服务端停止监听后调用
         /// </summary>
-        protected virtual void OnStopped() { }
+        protected virtual void OnStopped() 
+        {
+            Stopped?.Invoke();
+        }
 
         /// <summary>
         /// 当新会话开始后调用
         /// </summary>
         /// <param name="session">Connected session</param>
-        protected virtual void OnSessionStarted(TcpSession session) { }
+        protected virtual void OnSessionStarted(TcpSession session) 
+        {
+            SessionStarted?.Invoke(session);
+        }
 
         /// <summary>
         /// 当会话关闭后调用
         /// </summary>
         /// <param name="session">Disconnected session</param>
-        protected virtual void OnSessionClosed(TcpSession session) { }
+        protected virtual void OnSessionClosed(TcpSession session) 
+        {
+            SessionClosed?.Invoke(session);
+        }
         #endregion
 
         #region 公开方法
         /// <summary>
         /// 启动服务器
         /// </summary>
-        /// <returns>'true' 如果服务器启动成功, 'false' 如果服务器启动失败</returns>
-        public virtual bool Start()
+        public virtual void Start()
         {
-            lock (this)
+            try
             {
                 if (_isListening)
                 {
-                    return false;
+                    throw new Exception("服务端已经开始监听");
                 }
 
                 // 设置接受者事件参数
@@ -536,8 +574,10 @@ namespace IceCoffee.FastSocket.Tcp
 
                 // 开始接受客户端
                 StartAccept();
-
-                return true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in TcpServer.Start", ex);
             }
         }
 
@@ -545,22 +585,26 @@ namespace IceCoffee.FastSocket.Tcp
         /// 重新启动服务器
         /// </summary>
         /// <returns></returns>
-        public virtual bool Restart()
+        public virtual void Restart()
         {
-            Stop();
-            return Start();
+            if (_isListening)
+            {
+                Stop();
+            }
+            
+            Start();
         }
 
         /// <summary>
         /// 停止服务器
         /// </summary>
-        public virtual bool Stop()
+        public virtual void Stop()
         {
-            lock (this)
+            try
             {
                 if (_isListening == false)
                 {
-                    return false;
+                    throw new Exception("服务端已经停止监听");
                 }
 
                 _isListening = false;
@@ -586,11 +630,14 @@ namespace IceCoffee.FastSocket.Tcp
                 _socketAcceptor = null;
 
                 OnStopped();
-
-                return true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error in TcpServer.Stop", ex);
             }
         }
 
+        #region 组播
         /// <summary>
         /// 向所有连接的客户端组播数据
         /// </summary>
@@ -629,6 +676,8 @@ namespace IceCoffee.FastSocket.Tcp
         }
         #endregion
 
+        #endregion
+
         #region 回收资源
         internal void CollectRecvSaea(SocketAsyncEventArgs e)
         {
@@ -636,6 +685,7 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 if (_isListening)
                 {
+                    e.UserToken = null;
                     _recvSaeaPool.Return(e);
                 }
                 else
@@ -656,6 +706,7 @@ namespace IceCoffee.FastSocket.Tcp
                 {
                     e.SetBuffer(null, 0, 0);
                     e.BufferList = null;
+                    e.UserToken = null;
                     _sendSaeaPool.Return(e);
                 }
                 else
@@ -672,17 +723,23 @@ namespace IceCoffee.FastSocket.Tcp
         {
             try
             {
+                if(session == null)
+                {
+                    return;
+                }
+
                 if (_isListening)
                 {
-                    _sessions.TryRemove(session.SessionId, out _);
-                    session.Close();
-                    OnSessionClosed(session);
-                    _sessionPool.Return(session);
+                    if(_sessions.TryRemove(session.SessionId, out _))
+                    {
+                        session.Close();
+                        OnSessionClosed(session);
+                        _sessionPool.Return(session);
+                        return;
+                    }
                 }
-                else
-                {
-                    session.Dispose();
-                }
+                
+                session.Dispose();
             }
             catch (Exception ex)
             {
@@ -692,40 +749,19 @@ namespace IceCoffee.FastSocket.Tcp
         #endregion
 
         #region IDisposable implementation
-        private bool _isDisposed;
-
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposingManagedResources)
+        protected virtual void Dispose(bool disposing)
         {
-            if (_isDisposed == false)
+            if (disposing)
             {
-                if (disposingManagedResources)
-                {
-                    // Dispose managed resources here...
-                    Stop();
-                }
-
-                // Dispose unmanaged resources here...
-
-                // Set large fields to null here...
-
-                // Mark as disposed.
-                _isDisposed = true;
+                Stop();
             }
         }
-
-        // Use C# destructor syntax for finalization code.
-        ~TcpServer()
-        {
-            // Simply call Dispose(false).
-            Dispose(false);
-        }
-
         #endregion
         #endregion
 

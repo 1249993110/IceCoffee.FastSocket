@@ -11,7 +11,7 @@ namespace IceCoffee.FastSocket.Tcp
     public class TcpSession : IDisposable
     {
         #region 字段
-        internal Socket _socket;
+        internal Socket socket;
         private readonly TcpServer _tcpServer;
         private int _sessionId;
         private DateTime _connectedTime;
@@ -41,7 +41,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         internal void Initialize(Socket socket,  int sessionId)
         {
-            _socket = socket;
+            this.socket = socket;
             _sessionId = sessionId;
             _connectedTime = DateTime.Now;
             _remoteEndPoint = socket.RemoteEndPoint as IPEndPoint;
@@ -85,24 +85,22 @@ namespace IceCoffee.FastSocket.Tcp
         {
             lock (this)
             {
-                if (_socket == null)
+                if (socket != null)
                 {
-                    return;
-                }
+                    try
+                    {
+                        socket.Shutdown(SocketShutdown.Both);
+                    }
+                    catch (SocketException)
+                    {
+                    }
 
-                try
-                {
-                    _socket.Shutdown(SocketShutdown.Both);
-                }
-                catch (SocketException) 
-                { 
-                }
+                    socket.Close();
+                    ReadBuffer.Clear();
+                    OnClosed();
 
-                _socket.Close();
-                ReadBuffer.Clear();
-                OnClosed();
-
-                _socket = null;
+                    socket = null;
+                }
             }
         }
 
@@ -120,42 +118,18 @@ namespace IceCoffee.FastSocket.Tcp
         /// </summary>
         protected internal virtual void OnReceived() { }
 
-        #region IDisposable implementation
-        /// <summary>
-        /// Disposed flag
-        /// </summary>
-        private bool _isDisposed;
-
-        // Implement IDisposable.
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposingManagedResources)
+        protected virtual void Dispose(bool disposing)
         {
-            if (_isDisposed == false)
+            if (disposing)
             {
-                if (disposingManagedResources)
-                {
-                    // Dispose managed resources here...
-                    Close();
-                }
-
-                // Dispose unmanaged resources here...
-
-                // Set large fields to null here...
-
-                // Mark as disposed.
-                _isDisposed = true;
+                Close();
             }
         }
-
-        ~TcpSession()
-        {
-            Dispose(false);
-        }
-        #endregion
     }
 }
