@@ -131,7 +131,7 @@ namespace IceCoffee.FastSocket.Tcp
                 if (willRemoveLength > maxSize)// 截取第一个saea的部分即可
                 {
                     Array.Copy(saea.Buffer, _readOffset, result, 0, maxSize);
-                    _readOffset += (int)maxSize;
+                    _readOffset += maxSize;
                     _bytesAvailable -= maxSize;
                     return result;
                 }
@@ -146,11 +146,11 @@ namespace IceCoffee.FastSocket.Tcp
                 }
                 else// 需要在后面的saea中继续取
                 {
-                    int alreadyRemoveLength = 0;// 已移除长度
+                    int alreadyRemoveLength = saea.BytesTransferred - _readOffset;// 已移除长度
 
                     // 先取完第一个
-                    _bytesAvailable -= willRemoveLength;
-                    Array.Copy(saea.Buffer, _readOffset, result, 0, maxSize);
+                    _bytesAvailable -= alreadyRemoveLength;
+                    Array.Copy(saea.Buffer, _readOffset, result, 0, alreadyRemoveLength);
                     _readOffset = 0;
 
                     do
@@ -174,7 +174,7 @@ namespace IceCoffee.FastSocket.Tcp
                         }
                         else// 大于，截取最后一个saea的部分
                         {
-                            _readOffset = (int)(maxSize - alreadyRemoveLength);
+                            _readOffset = maxSize - alreadyRemoveLength;
                             _bytesAvailable -= _readOffset;
                             Array.Copy(saea.Buffer, 0, result, alreadyRemoveLength, _readOffset);
                             break;

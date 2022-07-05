@@ -69,6 +69,6 @@ namespace IceCoffee.FastSocket.Tcp
         /// <para>实际上是用于处理进站 (inbound)</para>
         /// </remarks>
         [DefaultValue(int.MaxValue)]
-        public int AcceptorBacklog { get; set; } = int.MaxValue;
+        public int AcceptorBacklog { get; set; } = 512;
     }
 }

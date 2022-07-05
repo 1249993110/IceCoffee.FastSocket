@@ -10,14 +10,14 @@ namespace UnitTest
     {
         static void Main(string[] args)
         {
-            TestUdpServer();
+            TestTcpServer();
         }
 
         static void TestTcpServer()
         {
             Console.WriteLine("Hello World!");
 
-            TestTcpServer testTcpServer = new TestTcpServer("10.166.168.201", 10114);
+            TestTcpServer testTcpServer = new TestTcpServer("127.0.0.1", 12345);
             testTcpServer.Start();
 
             string line;

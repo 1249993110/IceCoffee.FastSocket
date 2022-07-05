@@ -14,11 +14,10 @@ namespace UnitTest
         protected override void OnReceived()
         {
             byte[] data = ReadBuffer.ReadAll();
-            string message = Encoding.UTF8.GetString(data);
-            Console.WriteLine(message);
+            //string message = Encoding.UTF8.GetString(data);
+            //Console.WriteLine(message);
 
             SendAsync(data);
-            Close();
         }
     }
 }
