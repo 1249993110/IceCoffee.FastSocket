@@ -12,10 +12,10 @@ namespace IceCoffee.FastSocket.Tcp
     /// </summary>
     public class ReadBuffer
     {
-        #region 不固定字段，回收时重置
+        #region 不固定字段, 回收时重置
 
         /// <summary>
-        /// 保留最热的一个对象在外层，便于快速存取
+        /// 保留最热的一个对象在外层, 便于快速存取
         /// </summary>
         private SocketAsyncEventArgs _firstSaea;
 
@@ -59,8 +59,8 @@ namespace IceCoffee.FastSocket.Tcp
 
         #region 属性
         /// <summary>
-        /// <para>能否从读取缓冲区读取一行数据，通常在 ReadLine 前调用</para>
-        /// <para>如果换行符 ASCII（'\n'）包含在缓冲区中返回 true，否则返回 false</para>
+        /// <para>能否从读取缓冲区读取一行数据, 通常在 ReadLine 前调用</para>
+        /// <para>如果换行符 ASCII（'\n'）包含在缓冲区中返回 true, 否则返回 false</para>
         /// </summary>
         public bool CanReadLine
         {
@@ -76,10 +76,10 @@ namespace IceCoffee.FastSocket.Tcp
         }
 
         /// <summary>
-        /// <para>设置或读取内部读取缓冲区的最大长度（字节），读取缓冲区溢出将导致会话关闭,</para>
-        /// <para>缓冲区大小值小于或0意味着读取缓冲区不受限制，并且所有传入数据都被缓冲。默认值为 1M</para>
-        /// <para>如果您只在某些时间点（例如，在实时流应用程序中）读取数据</para>
-        /// <para>或者如果您希望保护套接字不受太多数据的影响（这些数据最终可能会导致应用程序内存不足），则此选项非常有用</para>
+        /// <para>设置或读取内部读取缓冲区的最大长度（字节）, 读取缓冲区溢出将导致会话关闭,</para>
+        /// <para>缓冲区大小值小于或0意味着读取缓冲区不受限制, 并且所有传入数据都被缓冲。默认值为 1M</para>
+        /// <para>如果您只在某些时间点（例如, 在实时流应用程序中）读取数据</para>
+        /// <para>或者如果您希望保护套接字不受太多数据的影响（这些数据最终可能会导致应用程序内存不足）, 则此选项非常有用</para>
         /// <para>内部读取缓冲区的大小必须为 ReceiveBufferSize（每次接收数据的缓冲区大小）的整数倍</para>
         /// </summary>
         public int ReadBufferMaxLength
@@ -105,7 +105,7 @@ namespace IceCoffee.FastSocket.Tcp
 
         #region 公开方法
         /// <summary>
-        /// 从缓冲区读取最多maxSize字节，并返回以字节数组形式读取的数据。
+        /// 从缓冲区读取最多maxSize字节, 并返回以字节数组形式读取的数据。
         /// <para>缓冲区为空、maxSize小于或等于0将返回空的字节数组</para>
         /// </summary>
         /// <param name="maxSize"></param>
@@ -172,7 +172,7 @@ namespace IceCoffee.FastSocket.Tcp
                             _collectSaea.Invoke(saea);
                             break;
                         }
-                        else// 大于，截取最后一个saea的部分
+                        else// 大于, 截取最后一个saea的部分
                         {
                             _readOffset = maxSize - alreadyRemoveLength;
                             _bytesAvailable -= _readOffset;
@@ -189,8 +189,8 @@ namespace IceCoffee.FastSocket.Tcp
         }
 
         /// <summary>
-        /// <para>从缓冲区读取所有剩余数据，并将其作为字节数组返回。</para>
-        /// <para>此方法无法报告错误；返回空的字节数组可能意味着当前没有可供读取的数据，或者发生错误。</para>
+        /// <para>从缓冲区读取所有剩余数据, 并将其作为字节数组返回。</para>
+        /// <para>此方法无法报告错误；返回空的字节数组可能意味着当前没有可供读取的数据, 或者发生错误。</para>
         /// </summary>
         /// <returns></returns>
         public byte[] ReadAll()
@@ -225,9 +225,9 @@ namespace IceCoffee.FastSocket.Tcp
         }
 
         /// <summary>
-        /// <para>从缓冲区读取一行，但不超过maxSize个字符，并以字节数组的形式返回结果，</para>
+        /// <para>从缓冲区读取一行, 但不超过maxSize个字符, 并以字节数组的形式返回结果, </para>
         /// <para>如果无法从缓冲区读取一整行将返回空的字节数组</para>
-        /// <para>此函数无法报告错误；返回空的字节数组可能意味着当前没有可供读取的数据，或者发生错误。</para>
+        /// <para>此函数无法报告错误；返回空的字节数组可能意味着当前没有可供读取的数据, 或者发生错误。</para>
         /// </summary>
         /// <returns></returns>
         public byte[] ReadLine()
@@ -243,7 +243,7 @@ namespace IceCoffee.FastSocket.Tcp
         }
 
         /// <summary>
-        ///  从数组头部开始搜索指定的byte对象，并返回读取缓存中第一个匹配项的索引，索引基于_readOffset偏移。
+        ///  从数组头部开始搜索指定的byte对象, 并返回读取缓存中第一个匹配项的索引, 索引基于_readOffset偏移。
         /// </summary>
         /// <param name="value"></param>
         /// <returns></returns>
@@ -253,7 +253,7 @@ namespace IceCoffee.FastSocket.Tcp
         }
 
         /// <summary>
-        ///  从数组头部开始搜索指定的byte值，并返回读取缓存中第一个匹配项的索引，索引基于_readOffset偏移。
+        ///  从数组头部开始搜索指定的byte值, 并返回读取缓存中第一个匹配项的索引, 索引基于_readOffset偏移。
         /// </summary>
         /// <param name="value">指定搜索的byte值</param>
         /// <param name="startIndex">开始搜索位置</param>
@@ -345,7 +345,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             else
             {
-                throw new Exception("读取缓冲区溢出，缓冲区中的字节数大于 " + ReadBufferMaxLength);
+                throw new Exception("读取缓冲区溢出, 缓冲区中的字节数大于 " + ReadBufferMaxLength);
             }
         }
 

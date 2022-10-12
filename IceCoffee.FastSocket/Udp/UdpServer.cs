@@ -204,7 +204,7 @@ namespace IceCoffee.FastSocket.Udp
 
                 if (_isStarted == false)
                 {
-                    throw new Exception("服务端尚未启动，无法发送数据");
+                    throw new Exception("服务端尚未启动, 无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -252,7 +252,7 @@ namespace IceCoffee.FastSocket.Udp
 
                 if (_isStarted == false)
                 {
-                    throw new Exception("服务端尚未启动，无法发送数据");
+                    throw new Exception("服务端尚未启动, 无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -387,7 +387,7 @@ namespace IceCoffee.FastSocket.Udp
         /// 创建一个新的套接字对象
         /// </summary>
         /// <remarks>
-        /// 如果您需要在您的实现中准备一些特定的套接字对象，则方法可能会被覆盖
+        /// 如果您需要在您的实现中准备一些特定的套接字对象, 则方法可能会被覆盖
         /// </remarks>
         /// <returns>Socket object</returns>
         protected virtual Socket CreateSocket()

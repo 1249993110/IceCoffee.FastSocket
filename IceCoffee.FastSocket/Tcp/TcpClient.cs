@@ -177,7 +177,7 @@ namespace IceCoffee.FastSocket.Tcp
 
                         OnReceived();
 
-                        // 如果在接收数据中断开，直接关闭当前连接
+                        // 如果在接收数据中断开, 直接关闭当前连接
                         if (_connectionState != ConnectionState.Connected)
                         {
                             ProcessClose(e);
@@ -296,7 +296,7 @@ namespace IceCoffee.FastSocket.Tcp
 
                 if (_connectionState != ConnectionState.Connected)
                 {
-                    throw new Exception("未成功连接服务端，无法发送数据");
+                    throw new Exception("未成功连接服务端, 无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -335,7 +335,7 @@ namespace IceCoffee.FastSocket.Tcp
 
                 if (_connectionState != ConnectionState.Connected)
                 {
-                    throw new Exception("未成功连接服务端，无法发送数据");
+                    throw new Exception("未成功连接服务端, 无法发送数据");
                 }
 
                 var e = _sendSaeaPool.Get();
@@ -360,7 +360,7 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 if (_connectionState == ConnectionState.Connecting)
                 {
-                    throw new TimeoutException("连接超时，或者连接的主机没有响应");
+                    throw new TimeoutException("连接超时, 或者连接的主机没有响应");
                 }
             }
             catch (Exception ex)
@@ -400,7 +400,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// 创建一个新的套接字对象
         /// </summary>
         /// <remarks>
-        /// 如果您需要在您的实现中准备一些特定的套接字对象，则方法可能会被覆盖
+        /// 如果您需要在您的实现中准备一些特定的套接字对象, 则方法可能会被覆盖
         /// </remarks>
         /// <returns>Socket object</returns>
         protected virtual Socket CreateSocketConnecter()
@@ -456,7 +456,7 @@ namespace IceCoffee.FastSocket.Tcp
             {
                 if (_connectionState != ConnectionState.Disconnected)
                 {
-                    throw new Exception("尝试连接失败，已经连接成功或正在连接或正在断开");
+                    throw new Exception("尝试连接失败, 已经连接成功或正在连接或正在断开");
                 }
 
                 ChangeConnectionState(ConnectionState.Connecting);
@@ -517,7 +517,7 @@ namespace IceCoffee.FastSocket.Tcp
                 }
                 else
                 {
-                    throw new Exception("尝试断开失败，未连接成功或未正在连接");
+                    throw new Exception("尝试断开失败, 未连接成功或未正在连接");
                 }
 
                 _connectionTimeoutChecker.Stop();
@@ -545,7 +545,7 @@ namespace IceCoffee.FastSocket.Tcp
                     _socketConnecter.Dispose();
                     _socketConnecter = null;
                 }
-                catch (ObjectDisposedException) // 如果在尝试连接中断开，即执行了 Socket.CancelConnectAsync
+                catch (ObjectDisposedException) // 如果在尝试连接中断开, 即执行了 Socket.CancelConnectAsync
                 {
                 }
 

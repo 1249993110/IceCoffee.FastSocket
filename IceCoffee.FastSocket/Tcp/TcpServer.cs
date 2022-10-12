@@ -120,7 +120,7 @@ namespace IceCoffee.FastSocket.Tcp
         {
             try
             {
-                // 由于正在重用上下文对象，因此必须清除套接字
+                // 由于正在重用上下文对象, 因此必须清除套接字
                 _acceptEventArg.AcceptSocket = null;
 
                 // 异步接受新的客户端连接
@@ -169,7 +169,7 @@ namespace IceCoffee.FastSocket.Tcp
 
                         if (_sessions.TryAdd(sessionId, session) == false)
                         {
-                            throw new Exception($"添加会话错误，sessionId: {sessionId} 已存在");
+                            throw new Exception($"添加会话错误, sessionId: {sessionId} 已存在");
                         }
 
                         OnSessionStarted(session);
@@ -196,7 +196,7 @@ namespace IceCoffee.FastSocket.Tcp
         }
 
         /// <summary>
-        /// 该方法是与 Socket.AcceptAsync() 关联的回调方法，操作并在接受操作完成时调用 
+        /// 该方法是与 Socket.AcceptAsync() 关联的回调方法, 操作并在接受操作完成时调用 
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -229,7 +229,7 @@ namespace IceCoffee.FastSocket.Tcp
                     
                     session.ReadBuffer.CacheSaea(e);
 
-                    // 如果在接收数据中出现异常，则不需要回收saea 只需回收会话，因为在 ReadBuffer.Clear 中已经回收过 saea
+                    // 如果在接收数据中出现异常, 则不需要回收saea 只需回收会话, 因为在 ReadBuffer.Clear 中已经回收过 saea
                     try
                     {
                         session.OnReceived();
@@ -241,7 +241,7 @@ namespace IceCoffee.FastSocket.Tcp
                         return;
                     }
 
-                    // 如果在接收数据中关闭会话，则不需要回收saea 只需回收会话，因为在 ReadBuffer.Clear 中已经回收过 saea
+                    // 如果在接收数据中关闭会话, 则不需要回收saea 只需回收会话, 因为在 ReadBuffer.Clear 中已经回收过 saea
                     if (session.socket == null)
                     {
                         CollectSession(session);
@@ -470,7 +470,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// 创建一个新的套接字接受器对象
         /// </summary>
         /// <remarks>
-        /// 如果您需要在您的实现中准备一些特定的套接字对象，则方法可能会被覆盖
+        /// 如果您需要在您的实现中准备一些特定的套接字对象, 则方法可能会被覆盖
         /// </remarks>
         /// <returns>Socket object</returns>
         protected virtual Socket CreateSocketAcceptor()

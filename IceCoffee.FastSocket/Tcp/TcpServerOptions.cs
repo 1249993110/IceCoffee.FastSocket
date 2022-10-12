@@ -23,8 +23,8 @@ namespace IceCoffee.FastSocket.Tcp
         /// 使用 keep-alive
         /// </summary>
         /// <remarks>
-        /// 保持连接检测对方主机是否崩溃，避免（服务器）永远阻塞于TCP连接的输入 SO_KEEPALIVE
-        /// <para>设置该选项后，如果2小时内在此套接口的任一方向都没有数据交换，TCP就自动给对方发一个存活保持探测分节 (keepalive probe)</para>
+        /// 保持连接检测对方主机是否崩溃, 避免（服务器）永远阻塞于TCP连接的输入 SO_KEEPALIVE
+        /// <para>设置该选项后, 如果2小时内在此套接口的任一方向都没有数据交换, TCP就自动给对方发一个存活保持探测分节 (keepalive probe)</para>
         /// </remarks>
         public bool KeepAlive { get; set; }
 
@@ -32,7 +32,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// 应用选项：不延迟直接发送
         /// </summary>
         /// <remarks>
-        /// 不延迟直接发送。Tcp为了合并小包而设计，客户端默认 false，服务端默认 true
+        /// 不延迟直接发送。Tcp为了合并小包而设计, 客户端默认 false, 服务端默认 true
         /// </remarks>
         [DefaultValue(true)]
         public bool NoDelay { get; set; } = true;
@@ -41,7 +41,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// 选项：重用地址
         /// </summary>
         /// <remarks>
-        /// 如果操作系统支持此功能，此选项将启用/禁用 SO_REUSEADDR
+        /// 如果操作系统支持此功能, 此选项将启用/禁用 SO_REUSEADDR
         /// </remarks>
         public bool ReuseAddress { get; set; }
 
@@ -49,7 +49,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// 选项：使套接字绑定为独占访问 
         /// </summary>
         /// <remarks>
-        /// 如果操作系统支持此功能，此选项将启用/禁用 SO_EXCLUSIVEADDRUSE
+        /// 如果操作系统支持此功能, 此选项将启用/禁用 SO_EXCLUSIVEADDRUSE
         /// </remarks>
         public bool ExclusiveAddressUse { get; set; }
 
@@ -57,7 +57,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// 选项：双模式
         /// </summary>
         /// <remarks>
-        /// 指定 Socket 是否是用于 IPv4 和 IPv6 的双模式套接字，仅当套接字绑定在 IPv6 地址上时才有效
+        /// 指定 Socket 是否是用于 IPv4 和 IPv6 的双模式套接字, 仅当套接字绑定在 IPv6 地址上时才有效
         /// </remarks>
         public bool DualMode { get; set; }
 
