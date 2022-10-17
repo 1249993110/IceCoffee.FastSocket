@@ -393,7 +393,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// <param name="exception"></param>
         protected virtual void OnExceptionCaught(Exception exception) 
         {
-            ExceptionCaught.Invoke(exception);
+            ExceptionCaught?.Invoke(exception);
         }
 
         /// <summary>
