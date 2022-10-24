@@ -482,7 +482,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in TcpClient.ConnectAsync", ex);
+                RaiseException(ex);
             }
         }
 
@@ -554,7 +554,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in TcpClient.DisconnectAsync", ex);
+                RaiseException(ex);
             }
         }
 

@@ -329,7 +329,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in TcpServer.SendAsync", ex);
+                RaiseException(ex);
             }
         }
         /// <summary>
@@ -377,7 +377,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in TcpServer.SendAsync", ex);
+                RaiseException(ex);
             }
         }
         #endregion
@@ -577,7 +577,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in TcpServer.Start", ex);
+                RaiseException(ex);
             }
         }
 
@@ -633,7 +633,7 @@ namespace IceCoffee.FastSocket.Tcp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in TcpServer.Stop", ex);
+                RaiseException(ex);
             }
         }
 

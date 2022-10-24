@@ -472,7 +472,7 @@ namespace IceCoffee.FastSocket.Udp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in UdpServer.Start", ex);
+                RaiseException(ex);
             }
         }
 
@@ -548,7 +548,7 @@ namespace IceCoffee.FastSocket.Udp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in UdpServer.Stop", ex);
+                RaiseException(ex);
             }
         }
         #endregion

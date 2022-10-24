@@ -489,7 +489,7 @@ namespace IceCoffee.FastSocket.Udp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in UpdClient.Open", ex);
+                RaiseException(ex);
             }
         }
 
@@ -518,7 +518,7 @@ namespace IceCoffee.FastSocket.Udp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in UpdClient.Close", ex);
+                RaiseException(ex);
             }
         }
 
@@ -544,7 +544,7 @@ namespace IceCoffee.FastSocket.Udp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in UpdClient.JoinMulticastGroup", ex);
+                RaiseException(ex);
             }
         }
         /// <summary>
@@ -577,7 +577,7 @@ namespace IceCoffee.FastSocket.Udp
             }
             catch (Exception ex)
             {
-                throw new Exception("Error in UpdClient.LeaveMulticastGroup", ex);
+                RaiseException(ex);
             }
         }
         /// <summary>
