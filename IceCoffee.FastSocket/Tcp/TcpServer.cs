@@ -543,7 +543,7 @@ namespace IceCoffee.FastSocket.Tcp
         /// <summary>
         /// 启动服务器
         /// </summary>
-        public virtual void Start()
+        public virtual bool Start()
         {
             try
             {
@@ -578,27 +578,30 @@ namespace IceCoffee.FastSocket.Tcp
             catch (Exception ex)
             {
                 RaiseException(ex);
+                return false;
             }
+
+            return true;
         }
 
         /// <summary>
         /// 重新启动服务器
         /// </summary>
         /// <returns></returns>
-        public virtual void Restart()
+        public virtual bool Restart()
         {
             if (_isListening)
             {
                 Stop();
             }
             
-            Start();
+            return Start();
         }
 
         /// <summary>
         /// 停止服务器
         /// </summary>
-        public virtual void Stop()
+        public virtual bool Stop()
         {
             try
             {
@@ -634,7 +637,10 @@ namespace IceCoffee.FastSocket.Tcp
             catch (Exception ex)
             {
                 RaiseException(ex);
+                return false;
             }
+
+            return true;
         }
 
         #region 组播

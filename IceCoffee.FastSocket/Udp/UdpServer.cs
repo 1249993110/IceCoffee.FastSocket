@@ -440,7 +440,7 @@ namespace IceCoffee.FastSocket.Udp
         /// <summary>
         /// 启动服务器
         /// </summary>
-        public virtual void Start()
+        public virtual bool Start()
         {
             try
             {
@@ -473,7 +473,10 @@ namespace IceCoffee.FastSocket.Udp
             catch (Exception ex)
             {
                 RaiseException(ex);
+                return false;
             }
+
+            return true;
         }
 
         /// <summary>
@@ -513,20 +516,20 @@ namespace IceCoffee.FastSocket.Udp
         /// 重新启动服务器
         /// </summary>
         /// <returns></returns>
-        public virtual void Restart()
+        public virtual bool Restart()
         {
             if (_isStarted)
             {
                 Stop();
             }
             
-            Start();
+            return Start();
         }
 
         /// <summary>
         /// 停止服务器
         /// </summary>
-        public virtual void Stop()
+        public virtual bool Stop()
         {
             try
             {
@@ -549,7 +552,10 @@ namespace IceCoffee.FastSocket.Udp
             catch (Exception ex)
             {
                 RaiseException(ex);
+                return false;
             }
+
+            return true;
         }
         #endregion
 
