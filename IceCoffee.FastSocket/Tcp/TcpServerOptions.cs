@@ -14,10 +14,10 @@ namespace IceCoffee.FastSocket.Tcp
     {
         /// <summary>
         /// 选项：接收缓冲区大小
-        /// <remarks>默认值是 8192</remarks>
+        /// <remarks>The size of a block. 4096 is chosen because most operating systems use 4k pages.</remarks>
         /// </summary>
-        [DefaultValue(8192)]
-        public int ReceiveBufferSize { get; set; } = 8192;
+        [DefaultValue(4096)]
+        public int ReceiveBufferSize { get; set; } = 4096;
 
         /// <summary>
         /// 使用 keep-alive

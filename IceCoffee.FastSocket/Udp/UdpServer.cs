@@ -464,7 +464,7 @@ namespace IceCoffee.FastSocket.Udp
                 _isStarted = true;
                 OnStarted();
 
-                if (_multicastEndpoint != null)
+                if (_multicastEndpoint == null)
                 {
                     // 开始接受数据
                     StartReceive();

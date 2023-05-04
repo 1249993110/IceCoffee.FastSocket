@@ -10,7 +10,7 @@ namespace UnitTest
     {
         static void Main(string[] args)
         {
-            TestTcpServer();
+            TestUdpServer();
         }
 
         static void TestTcpServer()
@@ -63,14 +63,16 @@ namespace UnitTest
         {
             Console.WriteLine("Hello World!");
             
-            TestUdpServer testUdpServer = new TestUdpServer(IPAddress.Any, 0);
-            testUdpServer.Start("239.255.0.1", 10114);
+            TestUdpServer testUdpServer = new TestUdpServer(IPAddress.Any, 10240);
+            testUdpServer.Start();
+            //TestUdpServer testUdpServer = new TestUdpServer(IPAddress.Any, 0);
+            //testUdpServer.Start("239.255.0.1", 10114);
 
             string line;
             do
             {
                 line = Console.ReadLine();
-                testUdpServer.MulticastAsync(Encoding.UTF8.GetBytes(line));
+                //testUdpServer.MulticastAsync(Encoding.UTF8.GetBytes(line));
 
             } while (line != "exit");
 
