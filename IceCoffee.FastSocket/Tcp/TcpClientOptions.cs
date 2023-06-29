@@ -40,9 +40,9 @@ namespace IceCoffee.FastSocket.Tcp
         /// 连接超时时长（单位：毫秒）
         /// </summary>
         /// <remarks>
-        /// 默认值：5000 毫秒
+        /// 默认值：20000 毫秒
         /// </remarks>
-        [DefaultValue(5000D)]
-        public double ConnectionTimeout { get; set; } = 5000D;
+        [DefaultValue(20000D)]
+        public double ConnectionTimeout { get; set; } = 20000D;
     }
 }
