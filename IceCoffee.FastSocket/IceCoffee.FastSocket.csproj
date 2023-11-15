@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<Authors>IceCoffee</Authors>
-		<Copyright>Copyright (c) 2021 IceCoffee</Copyright>
+		<Copyright>Copyright (c) 2023 IceCoffee</Copyright>
 		<Description>Fast and lightweight asynchronous socket server/client .NET library with support TCP and UDP</Description>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
@@ -10,8 +10,8 @@
 		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
 		<Product>IceCoffee</Product>
 		<RepositoryUrl>https://github.com/1249993110/IceCoffee.FastSocket</RepositoryUrl>
-		<TargetFrameworks>net6.0;net462</TargetFrameworks>
-		<Version>1.0.2.4</Version>
+		<TargetFrameworks>net8.0;net6.0;netstandard2.0;net462</TargetFrameworks>
+		<Version>1.0.3</Version>
 		<LangVersion>10.0</LangVersion>
 		<NoWarn>$(NoWarn);1591</NoWarn>
 		<Nullable>disable</Nullable>
@@ -30,7 +30,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="IceCoffee.Common" Version="1.0.4" />
+		<PackageReference Include="IceCoffee.Common" Version="1.0.5" />
 	</ItemGroup>
 
 </Project>
